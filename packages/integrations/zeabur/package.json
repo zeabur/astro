@@ -1,0 +1,58 @@
+{
+  "name": "@zeabur/astro-adapter",
+  "description": "Deploy your site to Zeabur",
+  "version": "1.0.0",
+  "type": "module",
+  "author": "zeabur",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zeabur/astro.git",
+    "directory": "packages/integrations/zeabur"
+  },
+  "keywords": [
+    "withastro",
+    "astro-adapter",
+    "zeabur"
+  ],
+  "bugs": "https://github.com/zeabur/astro/issues",
+  "homepage": "https://docs.astro.build/en/guides/integrations-guide/zeabur/",
+  "exports": {
+    "./serverless": "./dist/serverless/adapter.js",
+    "./serverless/entrypoint": "./dist/serverless/entrypoint.js",
+    "./static": "./dist/static/adapter.js",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "serverless": [
+        "dist/serverless/adapter.d.ts"
+      ],
+      "static": [
+        "dist/static/adapter.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "astro-scripts build \"src/**/*.ts\" && tsc"
+  },
+  "dependencies": {
+    "@astrojs/internal-helpers": "0.2.1",
+    "@vercel/nft": "^0.24.3",
+    "esbuild": "^0.19.6",
+    "fast-glob": "^3.3.2",
+    "set-cookie-parser": "^2.6.0",
+    "web-vitals": "^3.4.0"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.2"
+  },
+  "devDependencies": {
+    "@types/set-cookie-parser": "^2.4.6",
+    "astro": "workspace:*",
+    "astro-scripts": "workspace:*"
+  }
+}

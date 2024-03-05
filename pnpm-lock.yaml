@@ -5186,6 +5186,37 @@ importers:
         specifier: workspace:*
         version: link:../../../../../astro
 
+  packages/integrations/zeabur:
+    dependencies:
+      '@astrojs/internal-helpers':
+        specifier: 0.2.1
+        version: link:../../internal-helpers
+      '@vercel/nft':
+        specifier: ^0.24.3
+        version: 0.24.4
+      esbuild:
+        specifier: ^0.19.6
+        version: 0.19.11
+      fast-glob:
+        specifier: ^3.3.2
+        version: 3.3.2
+      set-cookie-parser:
+        specifier: ^2.6.0
+        version: 2.6.0
+      web-vitals:
+        specifier: ^3.4.0
+        version: 3.5.1
+    devDependencies:
+      '@types/set-cookie-parser':
+        specifier: ^2.4.6
+        version: 2.4.7
+      astro:
+        specifier: workspace:*
+        version: link:../../astro
+      astro-scripts:
+        specifier: workspace:*
+        version: link:../../../scripts
+
   packages/internal-helpers:
     devDependencies:
       astro-scripts:

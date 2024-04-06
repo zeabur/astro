@@ -1,6 +1,8 @@
 import type { AstroIntegrationLogger } from 'astro';
-import { relative, relative as relativePath } from 'node:path';
+import { join, relative, relative as relativePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { copyFilesToFunction } from './fs.js';
 
 export async function copyDependenciesToFunction(
@@ -77,6 +79,15 @@ export async function copyDependenciesToFunction(
 		outDir,
 		excludeFiles
 	);
+
+	// Add a index.mjs endpoint that just exports 'dist/index.mjs'
+	if (existsSync(join(fileURLToPath(outDir), 'dist/index.mjs'))) {
+		await writeFile(
+			join(fileURLToPath(outDir), 'index.mjs'),
+			`export { default } from './dist/index.mjs';
+export * from './dist/index.mjs';`
+		);
+	}
 
 	return {
 		// serverEntry location inside the outDir

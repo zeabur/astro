@@ -80,12 +80,14 @@ export async function copyDependenciesToFunction(
 		excludeFiles
 	);
 
-	// Add a index.mjs endpoint that just exports 'dist/index.mjs'
-	if (existsSync(join(fileURLToPath(outDir), 'dist/index.mjs'))) {
+	// Zeabur always takes the index.mjs file as the handler
+	const zeaburEntrypoint = join(fileURLToPath(outDir), 'index.mjs');
+	const handlerPath = relativePath(commonAncestor, entryPath);
+	if (!existsSync(zeaburEntrypoint)) {
 		await writeFile(
-			join(fileURLToPath(outDir), 'index.mjs'),
-			`export { default } from './dist/index.mjs';
-export * from './dist/index.mjs';`
+			zeaburEntrypoint,
+			`export { default } from './${handlerPath}';
+export * from './${handlerPath}';`
 		);
 	}
 

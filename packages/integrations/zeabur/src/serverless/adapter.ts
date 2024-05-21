@@ -129,7 +129,7 @@ export default function vercelServerless({
 			'astro:config:done': ({ setAdapter, config, logger }) => {
 				if (functionPerRoute === true) {
 					logger.warn(
-						`Vercel's hosting plans might have limits to the number of functions you can create.
+						`Zeabur's hosting plans might have limits to the number of functions you can create.
 Make sure to check your plan carefully to avoid incurring additional costs.
 You can set functionPerRoute: false to prevent surpassing the limit.`
 					);
@@ -286,14 +286,14 @@ function validateRuntime() {
 	const support = SUPPORTED_NODE_VERSIONS[major];
 	if (support.status === 'beta') {
 		console.warn(
-			`[${PACKAGE_NAME}] The local Node.js version (${major}) is currently in beta for Vercel Serverless Functions.`
+			`[${PACKAGE_NAME}] The local Node.js version (${major}) is currently in beta for Zeabur Serverless Functions.`
 		);
-		console.warn(`[${PACKAGE_NAME}] Make sure to update your Vercel settings to use ${major}.`);
+		console.warn(`[${PACKAGE_NAME}] Make sure to update your Zeabur settings to use ${major}.`);
 		return;
 	}
 	if (support === undefined) {
 		console.warn(
-			`[${PACKAGE_NAME}] The local Node.js version (${major}) is not supported by Vercel Serverless Functions.`
+			`[${PACKAGE_NAME}] The local Node.js version (${major}) is not supported by Zeabur Serverless Functions.`
 		);
 		console.warn(`[${PACKAGE_NAME}] Your project will use Node.js 18 as the runtime instead.`);
 		console.warn(`[${PACKAGE_NAME}] Consider switching your local version to 18.`);
@@ -304,7 +304,7 @@ function validateRuntime() {
 			`[${PACKAGE_NAME}] Your project is being built for Node.js ${major} as the runtime.`
 		);
 		console.warn(
-			`[${PACKAGE_NAME}] This version is deprecated by Vercel Serverless Functions, and scheduled to be disabled on ${new Intl.DateTimeFormat(
+			`[${PACKAGE_NAME}] This version is deprecated by Zeabur Serverless Functions, and scheduled to be disabled on ${new Intl.DateTimeFormat(
 				undefined,
 				{ dateStyle: 'long' }
 			).format(support.removal)}.`

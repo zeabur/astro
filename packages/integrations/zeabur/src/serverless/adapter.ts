@@ -17,16 +17,6 @@ const PACKAGE_NAME = '@zeabur/astro-adapter/serverless';
 export const ASTRO_LOCALS_HEADER = 'x-astro-locals';
 export const VERCEL_EDGE_MIDDLEWARE_FILE = 'vercel-edge-middleware';
 
-// https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/node-js#node.js-version
-const SUPPORTED_NODE_VERSIONS: Record<
-	string,
-	{ status: 'current' } | { status: 'beta' } | { status: 'deprecated'; removal: Date }
-> = {
-	16: { status: 'deprecated', removal: new Date('February 6 2024') },
-	18: { status: 'current' },
-	20: { status: 'beta' },
-};
-
 function getAdapter({
 	edgeMiddleware,
 	functionPerRoute,
@@ -185,8 +175,6 @@ You can set functionPerRoute: false to prevent surpassing the limit.`
 				const filesToInclude = includeFiles?.map((file) => new URL(file, _config.root)) || [];
 				filesToInclude.push(...extraFilesToInclude);
 
-				validateRuntime();
-
 				// Multiple entrypoint support
 				if (_entryPoints.size) {
 					const getRouteFuncName = (route: RouteData) => route.component.replace('src/pages/', '');
@@ -278,37 +266,4 @@ async function createFunctionFolder({
 	await writeJson(new URL(`./package.json`, functionFolder), {
 		type: 'module',
 	});
-}
-
-function validateRuntime() {
-	const version = process.version.slice(1); // 'v16.5.0' --> '16.5.0'
-	const major = version.split('.')[0]; // '16.5.0' --> '16'
-	const support = SUPPORTED_NODE_VERSIONS[major];
-	if (support.status === 'beta') {
-		console.warn(
-			`[${PACKAGE_NAME}] The local Node.js version (${major}) is currently in beta for Vercel Serverless Functions.`
-		);
-		console.warn(`[${PACKAGE_NAME}] Make sure to update your Vercel settings to use ${major}.`);
-		return;
-	}
-	if (support === undefined) {
-		console.warn(
-			`[${PACKAGE_NAME}] The local Node.js version (${major}) is not supported by Vercel Serverless Functions.`
-		);
-		console.warn(`[${PACKAGE_NAME}] Your project will use Node.js 18 as the runtime instead.`);
-		console.warn(`[${PACKAGE_NAME}] Consider switching your local version to 18.`);
-		return;
-	}
-	if (support.status === 'deprecated') {
-		console.warn(
-			`[${PACKAGE_NAME}] Your project is being built for Node.js ${major} as the runtime.`
-		);
-		console.warn(
-			`[${PACKAGE_NAME}] This version is deprecated by Vercel Serverless Functions, and scheduled to be disabled on ${new Intl.DateTimeFormat(
-				undefined,
-				{ dateStyle: 'long' }
-			).format(support.removal)}.`
-		);
-		console.warn(`[${PACKAGE_NAME}] Consider upgrading your local version to 18.`);
-	}
 }

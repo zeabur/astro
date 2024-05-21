@@ -1,5 +1,6 @@
 /// <reference types="vite/types/import-meta.d.ts" />
 /// <reference path="./types/content.d.ts" />
+/// <reference path="./types/actions.d.ts" />
 
 // eslint-disable-next-line  @typescript-eslint/no-namespace
 declare namespace App {
@@ -11,7 +12,7 @@ interface ImportMetaEnv {
 	/**
 	 * The prefix for Astro-generated asset links if the build.assetsPrefix config option is set. This can be used to create asset links not handled by Astro.
 	 */
-	readonly ASSETS_PREFIX: string;
+	readonly ASSETS_PREFIX: string | Record<string, string>;
 	/**
 	 * This is set to the site option specified in your project’s Astro config file.
 	 */
@@ -119,11 +120,9 @@ declare module 'astro:transitions' {
 declare module 'astro:transitions/client' {
 	type TransitionRouterModule = typeof import('./dist/virtual-modules/transitions-router.js');
 	export const navigate: TransitionRouterModule['navigate'];
-
-	type TransitionUtilModule = typeof import('./dist/virtual-modules/transitions-util.js');
-	export const supportsViewTransitions: TransitionUtilModule['supportsViewTransitions'];
-	export const getFallback: TransitionUtilModule['getFallback'];
-	export const transitionEnabledOnThisPage: TransitionUtilModule['transitionEnabledOnThisPage'];
+	export const supportsViewTransitions: TransitionRouterModule['supportsViewTransitions'];
+	export const getFallback: TransitionRouterModule['getFallback'];
+	export const transitionEnabledOnThisPage: TransitionRouterModule['transitionEnabledOnThisPage'];
 
 	export type Fallback = import('./dist/virtual-modules/transitions-types.js').Fallback;
 	export type Direction = import('./dist/virtual-modules/transitions-types.ts').Direction;

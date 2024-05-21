@@ -1,13 +1,18 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
+import {
+	MISSING_SESSION_ID_ERROR,
+	PROJECT_ID_FILE,
+	getAstroStudioUrl,
+	getSessionIdFromFile,
+} from '@astrojs/studio';
 import { slug } from 'github-slugger';
 import { bgRed, cyan } from 'kleur/colors';
 import ora from 'ora';
 import prompts from 'prompts';
-import { MISSING_SESSION_ID_ERROR } from '../../../errors.js';
-import { PROJECT_ID_FILE, getSessionIdFromFile } from '../../../tokens.js';
-import { getAstroStudioUrl } from '../../../utils.js';
+import { safeFetch } from '../../../../runtime/utils.js';
+import { type Result } from '../../../utils.js';
 
 export async function cmd() {
 	const sessionToken = await getSessionIdFromFile();
@@ -15,18 +20,20 @@ export async function cmd() {
 		console.error(MISSING_SESSION_ID_ERROR);
 		process.exit(1);
 	}
-	const getWorkspaceIdAsync = getWorkspaceId();
+	const getWorkspaceIdAsync = getWorkspaceId().catch((err) => {
+		return err as Error;
+	});
 	await promptBegin();
 	const isLinkExisting = await promptLinkExisting();
 	if (isLinkExisting) {
-		const workspaceId = await getWorkspaceIdAsync;
+		const workspaceId = unwrapWorkspaceId(await getWorkspaceIdAsync);
 		const existingProjectData = await promptExistingProjectName({ workspaceId });
 		return await linkProject(existingProjectData.id);
 	}
 
 	const isLinkNew = await promptLinkNew();
 	if (isLinkNew) {
-		const workspaceId = await getWorkspaceIdAsync;
+		const workspaceId = unwrapWorkspaceId(await getWorkspaceIdAsync);
 		const newProjectName = await promptNewProjectName();
 		const newProjectRegion = await promptNewProjectRegion();
 		const spinner = ora('Creating new project...').start();
@@ -51,34 +58,41 @@ async function linkProject(id: string) {
 
 async function getWorkspaceId(): Promise<string> {
 	const linkUrl = new URL(getAstroStudioUrl() + '/api/cli/workspaces.list');
-	const response = await fetch(linkUrl, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${await getSessionIdFromFile()}`,
-			'Content-Type': 'application/json',
+	const response = await safeFetch(
+		linkUrl,
+		{
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${await getSessionIdFromFile()}`,
+				'Content-Type': 'application/json',
+			},
 		},
-	});
-	if (!response.ok) {
-		// Unauthorized
-		if (response.status === 401) {
-			console.error(
-				`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
-					'astro db login'
-				)} to authenticate and then try linking again.\n\n`
-			);
-			process.exit(1);
+		(res) => {
+			// Unauthorized
+			if (res.status === 401) {
+				throw new Error(
+					`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
+						'astro login'
+					)} to authenticate and then try linking again.\n\n`
+				);
+			}
+			throw new Error(`Failed to fetch user workspace: ${res.status} ${res.statusText}`);
 		}
-		console.error(`Failed to fetch user workspace: ${response.status} ${response.statusText}`);
-		process.exit(1);
-	}
-	const { data, success } = (await response.json()) as
-		| { success: false; data: unknown }
-		| { success: true; data: { id: string }[] };
+	);
+
+	const { data, success } = (await response.json()) as Result<{ id: string }[]>;
 	if (!success) {
-		console.error(`Failed to fetch user's workspace.`);
-		process.exit(1);
+		throw new Error(`Failed to fetch user's workspace.`);
 	}
 	return data[0].id;
+}
+
+function unwrapWorkspaceId(workspaceId: string | Error): string {
+	if (typeof workspaceId !== 'string') {
+		console.error(workspaceId.message);
+		process.exit(1);
+	}
+	return workspaceId;
 }
 
 export async function createNewProject({
@@ -91,30 +105,32 @@ export async function createNewProject({
 	region: string;
 }) {
 	const linkUrl = new URL(getAstroStudioUrl() + '/api/cli/projects.create');
-	const response = await fetch(linkUrl, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${await getSessionIdFromFile()}`,
-			'Content-Type': 'application/json',
+	const response = await safeFetch(
+		linkUrl,
+		{
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${await getSessionIdFromFile()}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ workspaceId, name, region }),
 		},
-		body: JSON.stringify({ workspaceId, name, region }),
-	});
-	if (!response.ok) {
-		// Unauthorized
-		if (response.status === 401) {
-			console.error(
-				`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
-					'astro db login'
-				)} to authenticate and then try linking again.\n\n`
-			);
+		(res) => {
+			// Unauthorized
+			if (res.status === 401) {
+				console.error(
+					`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
+						'astro login'
+					)} to authenticate and then try linking again.\n\n`
+				);
+				process.exit(1);
+			}
+			console.error(`Failed to create project: ${res.status} ${res.statusText}`);
 			process.exit(1);
 		}
-		console.error(`Failed to create project: ${response.status} ${response.statusText}`);
-		process.exit(1);
-	}
-	const { data, success } = (await response.json()) as
-		| { success: false; data: unknown }
-		| { success: true; data: { id: string; idName: string } };
+	);
+
+	const { data, success } = (await response.json()) as Result<{ id: string; idName: string }>;
 	if (!success) {
 		console.error(`Failed to create project.`);
 		process.exit(1);
@@ -124,30 +140,31 @@ export async function createNewProject({
 
 export async function promptExistingProjectName({ workspaceId }: { workspaceId: string }) {
 	const linkUrl = new URL(getAstroStudioUrl() + '/api/cli/projects.list');
-	const response = await fetch(linkUrl, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${await getSessionIdFromFile()}`,
-			'Content-Type': 'application/json',
+	const response = await safeFetch(
+		linkUrl,
+		{
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${await getSessionIdFromFile()}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ workspaceId }),
 		},
-		body: JSON.stringify({ workspaceId }),
-	});
-	if (!response.ok) {
-		// Unauthorized
-		if (response.status === 401) {
-			console.error(
-				`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
-					'astro db login'
-				)} to authenticate and then try linking again.\n\n`
-			);
+		(res) => {
+			if (res.status === 401) {
+				console.error(
+					`${bgRed('Unauthorized')}\n\n  Are you logged in?\n  Run ${cyan(
+						'astro login'
+					)} to authenticate and then try linking again.\n\n`
+				);
+				process.exit(1);
+			}
+			console.error(`Failed to fetch projects: ${res.status} ${res.statusText}`);
 			process.exit(1);
 		}
-		console.error(`Failed to fetch projects: ${response.status} ${response.statusText}`);
-		process.exit(1);
-	}
-	const { data, success } = (await response.json()) as
-		| { success: false; data: unknown }
-		| { success: true; data: { id: string; idName: string }[] };
+	);
+
+	const { data, success } = (await response.json()) as Result<{ id: string; idName: string }[]>;
 	if (!success) {
 		console.error(`Failed to fetch projects.`);
 		process.exit(1);
@@ -233,6 +250,10 @@ export async function promptNewProjectRegion(): Promise<string> {
 		choices: [
 			{ title: 'North America (East)', value: 'NorthAmericaEast' },
 			{ title: 'North America (West)', value: 'NorthAmericaWest' },
+			{ title: 'Europe (Amsterdam)', value: 'EuropeCentral' },
+			{ title: 'South America (Brazil)', value: 'SouthAmericaEast' },
+			{ title: 'Asia (India)', value: 'AsiaSouth' },
+			{ title: 'Asia (Japan)', value: 'AsiaNorthEast' },
 		],
 		initial: 0,
 	});

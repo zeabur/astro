@@ -1,9 +1,9 @@
 import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Plugin, Rollup } from 'vite';
-import type { AstroSettings } from '../@types/astro.js';
-import { moduleIsTopLevelPage, walkParentInfos } from '../core/build/graph.js';
-import { type BuildInternals, getPageDataByViteID } from '../core/build/internal.js';
+import type { AstroSettings, SSRElement } from '../@types/astro.js';
+import { getAssetsPrefix } from '../assets/utils/getAssetsPrefix.js';
+import type { BuildInternals } from '../core/build/internal.js';
 import type { AstroBuildPlugin } from '../core/build/plugin.js';
 import type { StaticBuildOptions } from '../core/build/types.js';
 import type { ModuleLoader } from '../core/module-loader/loader.js';
@@ -70,8 +70,15 @@ export function astroContentAssetPropagationPlugin({
 						crawledFiles: styleCrawledFiles,
 					} = await getStylesForURL(pathToFileURL(basePath), devModuleLoader);
 
-					const { scripts: hoistedScripts, crawledFiles: scriptCrawledFiles } =
-						await getScriptsForURL(pathToFileURL(basePath), settings.config.root, devModuleLoader);
+					// Add hoisted script tags, skip if direct rendering with `directRenderScript`
+					const { scripts: hoistedScripts, crawledFiles: scriptCrawledFiles } = settings.config
+						.experimental.directRenderScript
+						? { scripts: new Set<SSRElement>(), crawledFiles: new Set<string>() }
+						: await getScriptsForURL(
+								pathToFileURL(basePath),
+								settings.config.root,
+								devModuleLoader
+							);
 
 					// Register files we crawled to be able to retrieve the rendered styles and scripts,
 					// as when they get updated, we need to re-transform ourselves.
@@ -141,8 +148,11 @@ export function astroConfigBuildPlugin(
 			'build:post': ({ ssrOutputs, clientOutputs, mutate }) => {
 				const outputs = ssrOutputs.flatMap((o) => o.output);
 				const prependBase = (src: string) => {
-					if (options.settings.config.build.assetsPrefix) {
-						return joinPaths(options.settings.config.build.assetsPrefix, src);
+					const { assetsPrefix } = options.settings.config.build;
+					if (assetsPrefix) {
+						const fileExtension = extname(src);
+						const pf = getAssetsPrefix(fileExtension, assetsPrefix);
+						return joinPaths(pf, src);
 					} else {
 						return prependForwardSlash(joinPaths(options.settings.config.base, src));
 					}
@@ -152,49 +162,25 @@ export function astroConfigBuildPlugin(
 						chunk.type === 'chunk' &&
 						(chunk.code.includes(LINKS_PLACEHOLDER) || chunk.code.includes(SCRIPTS_PLACEHOLDER))
 					) {
-						let entryStyles = new Set<string>();
-						let entryLinks = new Set<string>();
-						let entryScripts = new Set<string>();
+						const entryStyles = new Set<string>();
+						const entryLinks = new Set<string>();
+						const entryScripts = new Set<string>();
 
-						if (options.settings.config.experimental.contentCollectionCache) {
-							// TODO: hoisted scripts are still handled on the pageData rather than the asset propagation point
-							for (const id of chunk.moduleIds) {
-								const _entryCss = internals.propagatedStylesMap.get(id);
-								const _entryScripts = internals.propagatedScriptsMap.get(id);
-								if (_entryCss) {
-									for (const value of _entryCss) {
-										if (value.type === 'inline') entryStyles.add(value.content);
-										if (value.type === 'external') entryLinks.add(value.src);
-									}
-								}
-								if (_entryScripts) {
-									for (const value of _entryScripts) {
-										entryScripts.add(value);
-									}
+						for (const id of chunk.moduleIds) {
+							const _entryCss = internals.propagatedStylesMap.get(id);
+							const _entryScripts = internals.propagatedScriptsMap.get(id);
+							if (_entryCss) {
+								// TODO: Separating styles and links this way is not ideal. The `entryCss` list is order-sensitive
+								// and splitting them into two sets causes the order to be lost, because styles are rendered after
+								// links. Refactor this away in the future.
+								for (const value of _entryCss) {
+									if (value.type === 'inline') entryStyles.add(value.content);
+									if (value.type === 'external') entryLinks.add(value.src);
 								}
 							}
-						} else {
-							for (const id of Object.keys(chunk.modules)) {
-								for (const [pageInfo] of walkParentInfos(id, ssrPluginContext!)) {
-									if (moduleIsTopLevelPage(pageInfo)) {
-										const pageViteID = pageInfo.id;
-										const pageData = getPageDataByViteID(internals, pageViteID);
-										if (!pageData) continue;
-
-										const _entryCss = pageData.propagatedStyles?.get(id);
-										const _entryScripts = pageData.propagatedScripts?.get(id);
-										if (_entryCss) {
-											for (const value of _entryCss) {
-												if (value.type === 'inline') entryStyles.add(value.content);
-												if (value.type === 'external') entryLinks.add(value.src);
-											}
-										}
-										if (_entryScripts) {
-											for (const value of _entryScripts) {
-												entryScripts.add(value);
-											}
-										}
-									}
+							if (_entryScripts) {
+								for (const value of _entryScripts) {
+									entryScripts.add(value);
 								}
 							}
 						}
@@ -246,6 +232,8 @@ export function astroConfigBuildPlugin(
 						mutate(chunk, ['server'], newCode);
 					}
 				}
+
+				ssrPluginContext = undefined;
 			},
 		},
 	};

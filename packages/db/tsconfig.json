@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "include": ["src"],
+  "exclude": ["src/runtime/virtual.ts"],
   "compilerOptions": {
     "outDir": "./dist"
   }

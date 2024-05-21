@@ -35,6 +35,13 @@ export type SerializedRouteInfo = Omit<RouteInfo, 'routeData'> & {
 
 export type ImportComponentInstance = () => Promise<SinglePageBuiltModule>;
 
+export type AssetsPrefix =
+	| string
+	| ({
+			fallback: string;
+	  } & Record<string, string>)
+	| undefined;
+
 export type SSRManifest = {
 	adapterName: string;
 	routes: RouteInfo[];
@@ -43,23 +50,27 @@ export type SSRManifest = {
 	trailingSlash: 'always' | 'never' | 'ignore';
 	buildFormat: 'file' | 'directory' | 'preserve';
 	compressHTML: boolean;
-	assetsPrefix?: string;
+	assetsPrefix?: AssetsPrefix;
 	renderers: SSRLoadedRenderer[];
 	/**
 	 * Map of directive name (e.g. `load`) to the directive script code
 	 */
 	clientDirectives: Map<string, string>;
 	entryModules: Record<string, string>;
+	inlinedScripts: Map<string, string>;
 	assets: Set<string>;
 	componentMetadata: SSRResult['componentMetadata'];
 	pageModule?: SinglePageBuiltModule;
 	pageMap?: Map<ComponentPath, ImportComponentInstance>;
 	i18n: SSRManifestI18n | undefined;
 	middleware: MiddlewareHandler;
+	checkOrigin: boolean;
+	// TODO: remove once the experimental flag is removed
+	rewritingEnabled: boolean;
 };
 
 export type SSRManifestI18n = {
-	fallback?: Record<string, string>;
+	fallback: Record<string, string> | undefined;
 	strategy: RoutingStrategies;
 	locales: Locales;
 	defaultLocale: string;
@@ -68,10 +79,11 @@ export type SSRManifestI18n = {
 
 export type SerializedSSRManifest = Omit<
 	SSRManifest,
-	'middleware' | 'routes' | 'assets' | 'componentMetadata' | 'clientDirectives'
+	'middleware' | 'routes' | 'assets' | 'componentMetadata' | 'inlinedScripts' | 'clientDirectives'
 > & {
 	routes: SerializedRouteInfo[];
 	assets: string[];
 	componentMetadata: [string, SSRComponentMetadata][];
+	inlinedScripts: [string, string][];
 	clientDirectives: [string, string][];
 };

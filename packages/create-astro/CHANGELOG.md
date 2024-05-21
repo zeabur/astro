@@ -1,5 +1,25 @@
 # create-astro
 
+## 4.8.0
+
+### Minor Changes
+
+- [#10689](https://github.com/withastro/astro/pull/10689) [`683d51a5eecafbbfbfed3910a3f1fbf0b3531b99`](https://github.com/withastro/astro/commit/683d51a5eecafbbfbfed3910a3f1fbf0b3531b99) Thanks [@ematipico](https://github.com/ematipico)! - Deprecate support for versions of Node.js older than `v18.17.1` for Node.js 18, older than `v20.0.3` for Node.js 20, and the complete Node.js v19 release line.
+
+  This change is in line with Astro's [Node.js support policy](https://docs.astro.build/en/upgrade-astro/#support).
+
+## 4.7.5
+
+### Patch Changes
+
+- [#10487](https://github.com/withastro/astro/pull/10487) [`2330f22d6cf8cd150c19ec40359aed4d6b43ddec`](https://github.com/withastro/astro/commit/2330f22d6cf8cd150c19ec40359aed4d6b43ddec) Thanks [@satyarohith](https://github.com/satyarohith)! - Fixes a case where a promise wasn't awaited, causing an issue in Deno.
+
+## 4.7.4
+
+### Patch Changes
+
+- [#10255](https://github.com/withastro/astro/pull/10255) [`2aec2cdc21f48f9b4f1dd82e2fd16fa3d653ccc5`](https://github.com/withastro/astro/commit/2aec2cdc21f48f9b4f1dd82e2fd16fa3d653ccc5) Thanks [@natemoo-re](https://github.com/natemoo-re)! - Fixes an issue where TypeScript and `@astrojs/check` versions would occassionally print as `undefined`.
+
 ## 4.7.3
 
 ### Patch Changes

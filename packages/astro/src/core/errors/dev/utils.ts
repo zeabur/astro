@@ -171,10 +171,12 @@ function collectInfoFromStacktrace(error: SSRError & { stack: string }): StackIn
 			error.pluginCode ||
 			error.id ||
 			// TODO: this could be better, `src` might be something else
-			stackText.split('\n').find((ln) => ln.includes('src') || ln.includes('node_modules'));
+			stackText
+				.split('\n')
+				.find((ln) => ln.includes('src') || ln.includes('node_modules'));
 		// Disable eslint as we're not sure how to improve this regex yet
 		// eslint-disable-next-line regexp/no-super-linear-backtracking
-		const source = possibleFilePath?.replace(/^[^(]+\(([^)]+).*$/, '$1').replace(/^\s+at\s+/, '');
+		const source = possibleFilePath?.replace?.(/^[^(]+\(([^)]+).*$/, '$1').replace(/^\s+at\s+/, '');
 
 		let file = source?.replace(/:\d+/g, '');
 		const location = /:(\d+):(\d+)/.exec(source!) ?? [];
@@ -231,15 +233,15 @@ export function getDocsForError(err: ErrorWithMetadata): string | undefined {
 	}
 }
 
+const linkRegex = /\[([^[]+)\]\((.*)\)/g;
+const boldRegex = /\*\*(.+)\*\*/g;
+const urlRegex = / ((?:https?|ftp):\/\/[-\w+&@#\\/%?=~|!:,.;]*[-\w+&@#\\/%=~|])/gi;
+const codeRegex = /`([^`]+)`/g;
+
 /**
  * Render a subset of Markdown to HTML or a CLI output
  */
 export function renderErrorMarkdown(markdown: string, target: 'html' | 'cli') {
-	const linkRegex = /\[([^[]+)\]\((.*)\)/g;
-	const boldRegex = /\*\*(.+)\*\*/g;
-	const urlRegex = / ((?:https?|ftp):\/\/[-\w+&@#\\/%?=~|!:,.;]*[-\w+&@#\\/%=~|])/gi;
-	const codeRegex = /`([^`]+)`/g;
-
 	if (target === 'html') {
 		return escape(markdown)
 			.replace(linkRegex, `<a href="$2" target="_blank">$1</a>`)

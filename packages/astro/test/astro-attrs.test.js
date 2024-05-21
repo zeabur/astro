@@ -31,6 +31,18 @@ describe('Attributes', async () => {
 			'html-enum-false': { attribute: 'draggable', value: 'false' },
 		};
 
+		// cheerio will unescape the values, so checking that the url rendered unescaped to begin with has to be done manually
+		assert.equal(
+			html.includes('https://example.com/api/og?title=hello&description=somedescription'),
+			true
+		);
+
+		// cheerio will unescape the values, so checking that the url rendered unescaped to begin with has to be done manually
+		assert.equal(
+			html.includes('cmd: echo &#34;foo&#34; &#38;&#38; echo &#34;bar&#34; > /tmp/hello.txt'),
+			true
+		);
+
 		for (const id of Object.keys(attrs)) {
 			const { attribute, value } = attrs[id];
 			const attr = $(`#${id}`).attr(attribute);

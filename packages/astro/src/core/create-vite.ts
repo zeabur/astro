@@ -4,6 +4,7 @@ import glob from 'fast-glob';
 import * as vite from 'vite';
 import { crawlFrameworkPkgs } from 'vitefu';
 import type { AstroSettings } from '../@types/astro.js';
+import { getAssetsPrefix } from '../assets/utils/getAssetsPrefix.js';
 import astroAssetsPlugin from '../assets/vite-plugin-assets.js';
 import {
 	astroContentAssetPropagationPlugin,
@@ -12,12 +13,12 @@ import {
 } from '../content/index.js';
 import astroInternationalization from '../i18n/vite-plugin-i18n.js';
 import astroPrefetch from '../prefetch/vite-plugin-prefetch.js';
+import astroDevToolbar from '../toolbar/vite-plugin-dev-toolbar.js';
 import astroTransitions from '../transitions/vite-plugin-transitions.js';
 import astroPostprocessVitePlugin from '../vite-plugin-astro-postprocess/index.js';
 import { vitePluginAstroServer } from '../vite-plugin-astro-server/index.js';
 import astroVitePlugin from '../vite-plugin-astro/index.js';
 import configAliasVitePlugin from '../vite-plugin-config-alias/index.js';
-import astroDevToolbar from '../vite-plugin-dev-toolbar/vite-plugin-dev-toolbar.js';
 import envVitePlugin from '../vite-plugin-env/index.js';
 import vitePluginFileURL from '../vite-plugin-fileurl/index.js';
 import astroHeadPlugin from '../vite-plugin-head/index.js';
@@ -35,6 +36,7 @@ import type { Logger } from './logger/core.js';
 import { createViteLogger } from './logger/vite.js';
 import { vitePluginMiddleware } from './middleware/vite-plugin.js';
 import { joinPaths } from './path.js';
+import { isObject } from './util.js';
 
 interface CreateViteOptions {
 	settings: AstroSettings;
@@ -67,7 +69,7 @@ const ONLY_DEV_EXTERNAL = [
 	'string-width',
 ];
 
-/** Return a common starting point for all Vite actions */
+/** Return a base vite config as a common starting point for all Vite commands. */
 export async function createVite(
 	commandConfig: vite.InlineConfig,
 	{ settings, logger, mode, command, fs = nodeFs }: CreateViteOptions
@@ -135,7 +137,7 @@ export async function createVite(
 			envVitePlugin({ settings }),
 			markdownVitePlugin({ settings, logger }),
 			htmlVitePlugin(),
-			mdxVitePlugin({ settings, logger }),
+			mdxVitePlugin(),
 			astroPostprocessVitePlugin(),
 			astroIntegrationsContainerPlugin({ settings, logger }),
 			astroScriptsPageSSRPlugin({ settings }),
@@ -206,6 +208,7 @@ export async function createVite(
 			noExternal: [...ALWAYS_NOEXTERNAL, ...astroPkgsConfig.ssr.noExternal],
 			external: [...(mode === 'dev' ? ONLY_DEV_EXTERNAL : []), ...astroPkgsConfig.ssr.external],
 		},
+		build: { assetsDir: settings.config.build.assets },
 	};
 
 	// If the user provides a custom assets prefix, make sure assets handled by Vite
@@ -214,9 +217,9 @@ export async function createVite(
 	const assetsPrefix = settings.config.build.assetsPrefix;
 	if (assetsPrefix) {
 		commonConfig.experimental = {
-			renderBuiltUrl(filename, { type }) {
+			renderBuiltUrl(filename, { type, hostType }) {
 				if (type === 'asset') {
-					return joinPaths(assetsPrefix, filename);
+					return joinPaths(getAssetsPrefix(`.${hostType}`, assetsPrefix), filename);
 				}
 			},
 		};
@@ -318,6 +321,6 @@ function isCommonNotAstro(dep: string): boolean {
 	);
 }
 
-function stringifyForDefine(value: string | undefined): string {
-	return typeof value === 'string' ? JSON.stringify(value) : 'undefined';
+function stringifyForDefine(value: string | undefined | object): string {
+	return typeof value === 'string' || isObject(value) ? JSON.stringify(value) : 'undefined';
 }

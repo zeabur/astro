@@ -1,5 +1,92 @@
 # @astrojs/markdown-remark
 
+## 5.1.0
+
+### Minor Changes
+
+- [#10538](https://github.com/withastro/astro/pull/10538) [`ccafa8d230f65c9302421a0ce0a0adc5824bfd55`](https://github.com/withastro/astro/commit/ccafa8d230f65c9302421a0ce0a0adc5824bfd55) Thanks [@604qgc](https://github.com/604qgc)! - Adds a `data-language` attribute on the rendered `pre` elements to expose the highlighted syntax language.
+
+  For example, the following Markdown code block will expose `data-language="python"`:
+
+  ````
+  \```python
+  def func():
+      print('Hello Astro!')
+  \```
+  ````
+
+  This allows retrieving the language in a rehype plugin from `node.properties.dataLanguage` by accessing the `<pre>` element using `{ tagName: "pre" }`:
+
+  ```js
+  // myRehypePre.js
+  import { visit } from "unist-util-visit";
+  export default function myRehypePre() {
+    return (tree) => {
+      visit(tree, { tagName: "pre" }, (node) => {
+        const lang = node.properties.dataLanguage;
+        [...]
+      });
+    };
+  }
+  ```
+
+  Note: The `<pre>` element is not exposed when using Astro's `<Code />` component which outputs flattened HTML.
+
+  The `data-language` attribute may also be used in css rules:
+
+  ```css
+  pre::before {
+    content: attr(data-language);
+  }
+
+  pre[data-language='javascript'] {
+    font-size: 2rem;
+  }
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`683d51a5eecafbbfbfed3910a3f1fbf0b3531b99`](https://github.com/withastro/astro/commit/683d51a5eecafbbfbfed3910a3f1fbf0b3531b99)]:
+  - @astrojs/prism@3.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- [#10629](https://github.com/withastro/astro/pull/10629) [`2cf116f80cb5e421ab5cc5eb4a654e7b78c1b8de`](https://github.com/withastro/astro/commit/2cf116f80cb5e421ab5cc5eb4a654e7b78c1b8de) Thanks [@bluwy](https://github.com/bluwy)! - Removes deprecated APIs including `remarkShiki`, `remarkPrism`, `replaceCssVariables` and several unused types
+
+- [#10618](https://github.com/withastro/astro/pull/10618) [`374efcdff9625ca43309d89e3b9cfc9174351512`](https://github.com/withastro/astro/commit/374efcdff9625ca43309d89e3b9cfc9174351512) Thanks [@43081j](https://github.com/43081j)! - Updates Shiki syntax highlighting to lazily load shiki languages by default (only preloading `plaintext`). Additionally, the `createShikiHighlighter()` API now returns an asynchronous `highlight()` function due to this.
+
+## 4.3.2
+
+### Patch Changes
+
+- [#10540](https://github.com/withastro/astro/pull/10540) [`c585528f446ccca3d4c643f4af5d550b93c18902`](https://github.com/withastro/astro/commit/c585528f446ccca3d4c643f4af5d550b93c18902) Thanks [@imkunet](https://github.com/imkunet)! - This patch allows Shiki to use all of its reserved languages instead of the
+  previous behavior of forcing unknown languages to plaintext.
+
+## 4.3.1
+
+### Patch Changes
+
+- [#10494](https://github.com/withastro/astro/pull/10494) [`19e42c368184013fc30d1e46753b9e9383bb2bdf`](https://github.com/withastro/astro/commit/19e42c368184013fc30d1e46753b9e9383bb2bdf) Thanks [@bluwy](https://github.com/bluwy)! - Fixes support for Shiki transformers that access the `meta` to conditionally perform transformations
+
+## 4.3.0
+
+### Minor Changes
+
+- [#9960](https://github.com/withastro/astro/pull/9960) [`c081adf998d30419fed97d8fccc11340cdc512e0`](https://github.com/withastro/astro/commit/c081adf998d30419fed97d8fccc11340cdc512e0) Thanks [@StandardGage](https://github.com/StandardGage)! - Allows passing any props to the `<Code />` component
+
+- [#10130](https://github.com/withastro/astro/pull/10130) [`5a9528741fa98d017b269c7e4f013058028bdc5d`](https://github.com/withastro/astro/commit/5a9528741fa98d017b269c7e4f013058028bdc5d) Thanks [@bluwy](https://github.com/bluwy)! - Migrates `shikiji` to `shiki` 1.0
+
+- [#10104](https://github.com/withastro/astro/pull/10104) [`a31bbd7ff8f3ec62ee507f72d1d25140b82ffc18`](https://github.com/withastro/astro/commit/a31bbd7ff8f3ec62ee507f72d1d25140b82ffc18) Thanks [@remcohaszing](https://github.com/remcohaszing)! - Changes Astro's internal syntax highlighting to use rehype plugins instead of remark plugins. This provides better interoperability with other [rehype plugins](https://github.com/rehypejs/rehype/blob/main/doc/plugins.md#list-of-plugins) that deal with code blocks, in particular with third party syntax highlighting plugins and [`rehype-mermaid`](https://github.com/remcohaszing/rehype-mermaid).
+
+  This may be a breaking change if you are currently using:
+
+  - a remark plugin that relies on nodes of type `html`
+  - a rehype plugin that depends on nodes of type `raw`.
+
+  Please review your rendered code samples carefully, and if necessary, consider using a rehype plugin that deals with the generated `element` nodes instead. You can transform the AST of raw HTML strings, or alternatively use [`hast-util-to-html`](https://github.com/syntax-tree/hast-util-to-html) to get a string from a `raw` node.
+
 ## 4.2.1
 
 ### Patch Changes

@@ -4,10 +4,10 @@ import type { Options as RemarkRehypeOptions } from 'remark-rehype';
 import type {
 	BuiltinTheme,
 	LanguageRegistration,
-	ShikijiTransformer,
+	ShikiTransformer,
 	ThemeRegistration,
 	ThemeRegistrationRaw,
-} from 'shikiji';
+} from 'shiki';
 import type * as unified from 'unified';
 import type { VFile } from 'vfile';
 
@@ -38,9 +38,9 @@ export type ThemePresets = BuiltinTheme | 'css-variables';
 export interface ShikiConfig {
 	langs?: LanguageRegistration[];
 	theme?: ThemePresets | ThemeRegistration | ThemeRegistrationRaw;
-	experimentalThemes?: Record<string, ThemePresets | ThemeRegistration | ThemeRegistrationRaw>;
+	themes?: Record<string, ThemePresets | ThemeRegistration | ThemeRegistrationRaw>;
 	wrap?: boolean | null;
-	transformers?: ShikijiTransformer[];
+	transformers?: ShikiTransformer[];
 }
 
 export interface AstroMarkdownOptions {
@@ -51,13 +51,6 @@ export interface AstroMarkdownOptions {
 	remarkRehype?: RemarkRehype;
 	gfm?: boolean;
 	smartypants?: boolean;
-}
-
-export interface ImageMetadata {
-	src: string;
-	width: number;
-	height: number;
-	type: string;
 }
 
 export interface MarkdownProcessor {
@@ -83,20 +76,10 @@ export interface MarkdownProcessorRenderResult {
 	};
 }
 
-export interface MarkdownRenderingOptions
-	extends AstroMarkdownOptions,
-		MarkdownProcessorRenderOptions {}
-
 export interface MarkdownHeading {
 	depth: number;
 	slug: string;
 	text: string;
-}
-
-export interface MarkdownMetadata {
-	headings: MarkdownHeading[];
-	source: string;
-	html: string;
 }
 
 export interface MarkdownVFile extends VFile {
@@ -104,10 +87,4 @@ export interface MarkdownVFile extends VFile {
 		__astroHeadings?: MarkdownHeading[];
 		imagePaths?: Set<string>;
 	};
-}
-
-export interface MarkdownRenderingResult {
-	metadata: MarkdownMetadata;
-	vfile: MarkdownVFile;
-	code: string;
 }

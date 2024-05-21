@@ -1,7 +1,9 @@
 /* eslint-disable no-console */
-import type { DevToolbarApp as DevToolbarAppDefinition } from '../../../@types/astro.js';
+import type { ResolvedDevToolbarApp as DevToolbarAppDefinition } from '../../../@types/astro.js';
+import { type ToolbarAppEventTarget, serverHelpers } from './helpers.js';
 import { settings } from './settings.js';
 import { type Icon, getIconElement, isDefinedIcon } from './ui-library/icons.js';
+import { type Placement } from './ui-library/window.js';
 
 export type DevToolbarApp = DevToolbarAppDefinition & {
 	builtIn: boolean;
@@ -9,8 +11,9 @@ export type DevToolbarApp = DevToolbarAppDefinition & {
 	status: 'ready' | 'loading' | 'error';
 	notification: {
 		state: boolean;
+		level?: 'error' | 'warning' | 'info';
 	};
-	eventTarget: EventTarget;
+	eventTarget: ToolbarAppEventTarget;
 };
 const WS_EVENT_NAME = 'astro-dev-toolbar';
 // TODO: Remove in Astro 5.0
@@ -56,8 +59,6 @@ export class AstroDevToolbar extends HTMLElement {
 			#dev-toolbar-root {
 				position: fixed;
 				bottom: 0px;
-				left: 50%;
-				transform: translate(-50%, 0%);
 				z-index: 2000000010;
 				display: flex;
 				flex-direction: column;
@@ -72,6 +73,17 @@ export class AstroDevToolbar extends HTMLElement {
 
 			#dev-toolbar-root[data-hidden] #dev-bar .item {
 				opacity: 0.2;
+			}
+
+			#dev-toolbar-root[data-placement="bottom-left"] {
+				left: 16px;
+			}
+			#dev-toolbar-root[data-placement="bottom-center"] {
+				left: 50%;
+				transform: translateX(-50%);
+			}
+			#dev-toolbar-root[data-placement="bottom-right"] {
+				right: 16px;
 			}
 
 			#dev-bar-hitbox-above,
@@ -159,6 +171,7 @@ export class AstroDevToolbar extends HTMLElement {
 				opacity: 0;
 				transition: opacity 0.2s ease-in-out 0s;
 				pointer-events: none;
+				user-select: none;
 			}
 
 			#dev-bar .item-tooltip::after{
@@ -187,8 +200,14 @@ export class AstroDevToolbar extends HTMLElement {
 				}
 			}
 
-			#dev-bar #bar-container .item.active .notification {
-				border-color: rgba(71, 78, 94, 1);
+			#dev-bar #bar-container .item:hover .notification rect, #dev-bar #bar-container .item:hover .notification path {
+				stroke: #38393D;
+				--fill: var(--fill-hover);
+			}
+
+			#dev-bar #bar-container .item.active .notification rect, #dev-bar #bar-container .item.active .notification path {
+				stroke: #454C5C;
+				--fill: var(--fill-hover);
 			}
 
 			#dev-bar .item .icon {
@@ -198,7 +217,7 @@ export class AstroDevToolbar extends HTMLElement {
 				user-select: none;
 			}
 
-			#dev-bar .item svg {
+			#dev-bar .item .icon>svg {
 				width: 20px;
 				height: 20px;
 				display: block;
@@ -216,11 +235,12 @@ export class AstroDevToolbar extends HTMLElement {
 				position: absolute;
 				top: -4px;
 				right: -6px;
-				width: 8px;
-				height: 8px;
-				border-radius: 9999px;
-				border: 1px solid rgba(19, 21, 26, 1);
-				background: #B33E66;
+				width: 10px;
+				height: 10px;
+			}
+
+			#dev-bar .item .notification svg {
+				display: block;
 			}
 
 			#dev-toolbar-root:not([data-no-notification]) #dev-bar .item .notification[data-active] {
@@ -239,7 +259,7 @@ export class AstroDevToolbar extends HTMLElement {
 		</style>
 		<div id="dev-toolbar-root" data-hidden ${
 			settings.config.disableAppNotification ? 'data-no-notification' : ''
-		}>
+		} data-placement="${settings.config.placement}">
 			<div id="dev-bar-hitbox-above"></div>
 			<div id="dev-bar">
 				<div id="bar-container">
@@ -264,7 +284,9 @@ export class AstroDevToolbar extends HTMLElement {
 							: ''
 					}
 					<div class="separator"></div>
-					${this.getAppTemplate(this.apps.find((app) => app.builtIn && app.id === 'astro:settings')!)}
+					${this.getAppTemplate(
+						this.apps.find((app) => app.builtIn && app.id === 'astro:settings')!
+					)}
 				</div>
 			</div>
 			<div id="dev-bar-hitbox-below"></div>
@@ -364,7 +386,7 @@ export class AstroDevToolbar extends HTMLElement {
 		try {
 			settings.logger.verboseLog(`Initializing app ${app.id}`);
 
-			await app.init?.(shadowRoot, app.eventTarget);
+			await app.init?.(shadowRoot, app.eventTarget, serverHelpers);
 			app.status = 'ready';
 
 			if (import.meta.hot) {
@@ -549,6 +571,19 @@ export class AstroDevToolbar extends HTMLElement {
 		moreCanvas?.shadowRoot
 			?.querySelector('#dropdown')
 			?.toggleAttribute('data-no-notification', !newStatus);
+	}
+
+	setToolbarPlacement(newPlacement: Placement) {
+		this.devToolbarContainer?.setAttribute('data-placement', newPlacement);
+		this.apps.forEach((app) => {
+			app.eventTarget.dispatchEvent(
+				new CustomEvent('placement-updated', {
+					detail: {
+						placement: newPlacement,
+					},
+				})
+			);
+		});
 	}
 }
 

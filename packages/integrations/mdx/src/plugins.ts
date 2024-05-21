@@ -1,38 +1,36 @@
 import {
 	rehypeHeadingIds,
+	rehypePrism,
+	rehypeShiki,
 	remarkCollectImages,
-	remarkPrism,
-	remarkShiki,
 } from '@astrojs/markdown-remark';
 import { createProcessor, nodeTypes } from '@mdx-js/mdx';
+import { rehypeAnalyzeAstroMetadata } from 'astro/jsx/rehype.js';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import remarkSmartypants from 'remark-smartypants';
 import { SourceMapGenerator } from 'source-map';
 import type { PluggableList } from 'unified';
 import type { MdxOptions } from './index.js';
-import { recmaInjectImportMetaEnv } from './recma-inject-import-meta-env.js';
 import { rehypeApplyFrontmatterExport } from './rehype-apply-frontmatter-export.js';
 import { rehypeInjectHeadingsExport } from './rehype-collect-headings.js';
+import { rehypeImageToComponent } from './rehype-images-to-component.js';
 import rehypeMetaString from './rehype-meta-string.js';
 import { rehypeOptimizeStatic } from './rehype-optimize-static.js';
-import { remarkImageToComponent } from './remark-images-to-component.js';
 
 // Skip nonessential plugins during performance benchmark runs
 const isPerformanceBenchmark = Boolean(process.env.ASTRO_PERFORMANCE_BENCHMARK);
 
 interface MdxProcessorExtraOptions {
 	sourcemap: boolean;
-	importMetaEnv: Record<string, any>;
 }
 
 export function createMdxProcessor(mdxOptions: MdxOptions, extraOptions: MdxProcessorExtraOptions) {
 	return createProcessor({
 		remarkPlugins: getRemarkPlugins(mdxOptions),
 		rehypePlugins: getRehypePlugins(mdxOptions),
-		recmaPlugins: getRecmaPlugins(mdxOptions, extraOptions.importMetaEnv),
+		recmaPlugins: mdxOptions.recmaPlugins,
 		remarkRehypeOptions: mdxOptions.remarkRehype,
-		jsx: true,
 		jsxImportSource: 'astro',
 		// Note: disable `.md` (and other alternative extensions for markdown files like `.markdown`) support
 		format: 'mdx',
@@ -54,22 +52,7 @@ function getRemarkPlugins(mdxOptions: MdxOptions): PluggableList {
 		}
 	}
 
-	remarkPlugins = [
-		...remarkPlugins,
-		...mdxOptions.remarkPlugins,
-		remarkCollectImages,
-		remarkImageToComponent,
-	];
-
-	if (!isPerformanceBenchmark) {
-		// Apply syntax highlighters after user plugins to match `markdown/remark` behavior
-		if (mdxOptions.syntaxHighlight === 'shiki') {
-			remarkPlugins.push([remarkShiki, mdxOptions.shikiConfig]);
-		}
-		if (mdxOptions.syntaxHighlight === 'prism') {
-			remarkPlugins.push(remarkPrism);
-		}
-	}
+	remarkPlugins.push(...mdxOptions.remarkPlugins, remarkCollectImages);
 
 	return remarkPlugins;
 }
@@ -79,18 +62,32 @@ function getRehypePlugins(mdxOptions: MdxOptions): PluggableList {
 		// ensure `data.meta` is preserved in `properties.metastring` for rehype syntax highlighters
 		rehypeMetaString,
 		// rehypeRaw allows custom syntax highlighters to work without added config
-		[rehypeRaw, { passThrough: nodeTypes }] as any,
+		[rehypeRaw, { passThrough: nodeTypes }],
 	];
 
-	rehypePlugins = [
-		...rehypePlugins,
-		...mdxOptions.rehypePlugins,
+	if (!isPerformanceBenchmark) {
+		// Apply syntax highlighters after user plugins to match `markdown/remark` behavior
+		if (mdxOptions.syntaxHighlight === 'shiki') {
+			rehypePlugins.push([rehypeShiki, mdxOptions.shikiConfig]);
+		} else if (mdxOptions.syntaxHighlight === 'prism') {
+			rehypePlugins.push(rehypePrism);
+		}
+	}
+
+	rehypePlugins.push(...mdxOptions.rehypePlugins, rehypeImageToComponent);
+
+	if (!isPerformanceBenchmark) {
 		// getHeadings() is guaranteed by TS, so this must be included.
 		// We run `rehypeHeadingIds` _last_ to respect any custom IDs set by user plugins.
-		...(isPerformanceBenchmark ? [] : [rehypeHeadingIds, rehypeInjectHeadingsExport]),
-		// computed from `astro.data.frontmatter` in VFile data
+		rehypePlugins.push(rehypeHeadingIds, rehypeInjectHeadingsExport);
+	}
+
+	rehypePlugins.push(
+		// Render info from `vfile.data.astro.data.frontmatter` as JS
 		rehypeApplyFrontmatterExport,
-	];
+		// Analyze MDX nodes and attach to `vfile.data.__astroMetadata`
+		rehypeAnalyzeAstroMetadata
+	);
 
 	if (mdxOptions.optimize) {
 		// Convert user `optimize` option to compatible `rehypeOptimizeStatic` option
@@ -99,11 +96,4 @@ function getRehypePlugins(mdxOptions: MdxOptions): PluggableList {
 	}
 
 	return rehypePlugins;
-}
-
-function getRecmaPlugins(
-	mdxOptions: MdxOptions,
-	importMetaEnv: Record<string, any>
-): PluggableList {
-	return [...(mdxOptions.recmaPlugins ?? []), [recmaInjectImportMetaEnv, { importMetaEnv }]];
 }

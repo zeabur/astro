@@ -2,7 +2,11 @@ import type { SourceDescription } from 'rollup';
 import type * as vite from 'vite';
 import type { AstroConfig, AstroSettings } from '../@types/astro.js';
 import type { Logger } from '../core/logger/core.js';
-import type { CompileMetadata, PluginMetadata as AstroPluginMetadata } from './types.js';
+import type {
+	PluginCssMetadata as AstroPluginCssMetadata,
+	PluginMetadata as AstroPluginMetadata,
+	CompileMetadata,
+} from './types.js';
 
 import { normalizePath } from 'vite';
 import { normalizeFilename } from '../vite-plugin-utils/index.js';
@@ -11,7 +15,7 @@ import { handleHotUpdate } from './hmr.js';
 import { parseAstroRequest } from './query.js';
 import { loadId } from './utils.js';
 export { getAstroMetadata } from './metadata.js';
-export type { AstroPluginMetadata };
+export type { AstroPluginMetadata, AstroPluginCssMetadata };
 
 interface AstroPluginOptions {
 	settings: AstroSettings;
@@ -85,12 +89,22 @@ export default function astro({ settings, logger }: AstroPluginOptions): vite.Pl
 			// modules are compiled first, then its virtual modules.
 			const filename = normalizePath(normalizeFilename(parsedId.filename, config.root));
 			let compileMetadata = astroFileToCompileMetadata.get(filename);
-			// If `compileMetadata` doesn't exist in dev, that means the virtual module may have been invalidated.
-			// We try to re-compile the main Astro module (`filename`) first before retrieving the metadata again.
-			if (!compileMetadata && server) {
-				const code = await loadId(server.pluginContainer, filename);
-				// `compile` should re-set `filename` in `astroFileToCompileMetadata`
-				if (code != null) await compile(code, filename);
+			if (!compileMetadata) {
+				// If `compileMetadata` doesn't exist in dev, that means the virtual module may have been invalidated.
+				// We try to re-compile the main Astro module (`filename`) first before retrieving the metadata again.
+				if (server) {
+					const code = await loadId(server.pluginContainer, filename);
+					// `compile` should re-set `filename` in `astroFileToCompileMetadata`
+					if (code != null) await compile(code, filename);
+				}
+				// When cached we might load client-side scripts during the build
+				else if (config.experimental.contentCollectionCache) {
+					await this.load({
+						id: filename,
+						resolveDependencies: false,
+					});
+				}
+
 				compileMetadata = astroFileToCompileMetadata.get(filename);
 			}
 			// If the metadata still doesn't exist, that means the virtual modules are somehow compiled first,
@@ -116,7 +130,20 @@ export default function astro({ settings, logger }: AstroPluginOptions): vite.Pl
 					// Register dependencies from preprocessing this style
 					result.dependencies?.forEach((dep) => this.addWatchFile(dep));
 
-					return { code: result.code };
+					return {
+						code: result.code,
+						// This metadata is used by `cssScopeToPlugin` to remove this module from the bundle
+						// if the `filename` default export (the Astro component) is unused.
+						meta: result.isGlobal
+							? undefined
+							: ({
+									astroCss: {
+										cssScopeTo: {
+											[filename]: ['default'],
+										},
+									},
+								} satisfies AstroPluginCssMetadata),
+					};
 				}
 				case 'script': {
 					if (typeof query.index === 'undefined') {

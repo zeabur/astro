@@ -1,5 +1,75 @@
 # @astrojs/react
 
+## 3.3.4
+
+### Patch Changes
+
+- [#10986](https://github.com/withastro/astro/pull/10986) [`4d16381`](https://github.com/withastro/astro/commit/4d163811e1a25affb2c3d9adb3af650b7f1c91b6) Thanks [@emish89](https://github.com/emish89)! - Fixes incorrect `peerDependencies` for `@types/react` and `@types/react-dom`
+
+## 3.3.3
+
+### Patch Changes
+
+- [#10942](https://github.com/withastro/astro/pull/10942) [`d47baa4`](https://github.com/withastro/astro/commit/d47baa466aaeedde9c79ed5375d0be34762ac8b6) Thanks [@matthewp](https://github.com/matthewp)! - Updates package to support React 19 beta
+
+## 3.3.2
+
+### Patch Changes
+
+- [#10893](https://github.com/withastro/astro/pull/10893) [`fd7a9ed`](https://github.com/withastro/astro/commit/fd7a9ed3379a123f02f297b69fa5da0053e84a89) Thanks [@Angrigo](https://github.com/Angrigo)! - Removes using deprecated `ReactDOMServer.renderToStaticNodeStream` API
+
+## 3.3.1
+
+### Patch Changes
+
+- [#10855](https://github.com/withastro/astro/pull/10855) [`f6bddd3`](https://github.com/withastro/astro/commit/f6bddd3a155cd10a9f85c92d43b1af8b74786a42) Thanks [@lamATnginx](https://github.com/lamATnginx)! - Fix Redoc usage in React integration
+
+## 3.3.0
+
+### Minor Changes
+
+- [#10689](https://github.com/withastro/astro/pull/10689) [`683d51a5eecafbbfbfed3910a3f1fbf0b3531b99`](https://github.com/withastro/astro/commit/683d51a5eecafbbfbfed3910a3f1fbf0b3531b99) Thanks [@ematipico](https://github.com/ematipico)! - Deprecate support for versions of Node.js older than `v18.17.1` for Node.js 18, older than `v20.0.3` for Node.js 20, and the complete Node.js v19 release line.
+
+  This change is in line with Astro's [Node.js support policy](https://docs.astro.build/en/upgrade-astro/#support).
+
+## 3.2.0
+
+### Minor Changes
+
+- [#10675](https://github.com/withastro/astro/pull/10675) [`14f1d49a10541fecc4c10def8a094322442ccf23`](https://github.com/withastro/astro/commit/14f1d49a10541fecc4c10def8a094322442ccf23) Thanks [@fightingcat](https://github.com/fightingcat)! - Expose Babel config for @astro/react.
+
+## 3.1.1
+
+### Patch Changes
+
+- [#10654](https://github.com/withastro/astro/pull/10654) [`195f51f82a44df32be73865949aabee0d46ffe61`](https://github.com/withastro/astro/commit/195f51f82a44df32be73865949aabee0d46ffe61) Thanks [@matthewp](https://github.com/matthewp)! - Mark @material-tailwind/react as noExternal
+
+## 3.1.0
+
+### Minor Changes
+
+- [#10136](https://github.com/withastro/astro/pull/10136) [`9cd84bd19b92fb43ae48809f575ee12ebd43ea8f`](https://github.com/withastro/astro/commit/9cd84bd19b92fb43ae48809f575ee12ebd43ea8f) Thanks [@matthewp](https://github.com/matthewp)! - Changes the default behavior of `transition:persist` to update the props of persisted islands upon navigation. Also adds a new view transitions option `transition:persist-props` (default: `false`) to prevent props from updating as needed.
+
+  Islands which have the `transition:persist` property to keep their state when using the `<ViewTransitions />` router will now have their props updated upon navigation. This is useful in cases where the component relies on page-specific props, such as the current page title, which should update upon navigation.
+
+  For example, the component below is set to persist across navigation. This component receives a `products` props and might have some internal state, such as which filters are applied:
+
+  ```astro
+  <ProductListing transition:persist products={products} />
+  ```
+
+  Upon navigation, this component persists, but the desired `products` might change, for example if you are visiting a category of products, or you are performing a search.
+
+  Previously the props would not change on navigation, and your island would have to handle updating them externally, such as with API calls.
+
+  With this change the props are now updated, while still preserving state.
+
+  You can override this new default behavior on a per-component basis using `transition:persist-props=true` to persist both props and state during navigation:
+
+  ```astro
+  <ProductListing transition:persist-props="true" products={products} />
+  ```
+
 ## 3.0.10
 
 ### Patch Changes

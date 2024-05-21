@@ -1,19 +1,22 @@
 import type { GetModuleInfo } from 'rollup';
-import type { BuildOptions, Plugin as VitePlugin, ResolvedConfig } from 'vite';
+import type { BuildOptions, ResolvedConfig, Rollup, Plugin as VitePlugin } from 'vite';
 import { isBuildableCSSRequest } from '../../../vite-plugin-astro-server/util.js';
 import type { BuildInternals } from '../internal.js';
 import type { AstroBuildPlugin, BuildTarget } from '../plugin.js';
 import type { PageBuildData, StaticBuildOptions, StylesheetAsset } from '../types.js';
 
-import { PROPAGATED_ASSET_FLAG } from '../../../content/consts.js';
+import { hasAssetPropagationFlag } from '../../../content/index.js';
+import type { AstroPluginCssMetadata } from '../../../vite-plugin-astro/index.js';
 import * as assetName from '../css-asset-name.js';
-import { moduleIsTopLevelPage, walkParentInfos } from '../graph.js';
 import {
-	eachPageData,
+	getParentExtendedModuleInfos,
+	getParentModuleInfos,
+	moduleIsTopLevelPage,
+} from '../graph.js';
+import {
 	getPageDataByViteID,
 	getPageDatasByClientOnlyID,
 	getPageDatasByHoistedScriptId,
-	isHoistedScript,
 } from '../internal.js';
 import { extendManualChunks, shouldInlineAsset } from './util.js';
 
@@ -57,11 +60,8 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 
 	// stylesheet filenames are kept in here until "post", when they are rendered and ready to be inlined
 	const pagesToCss: Record<string, Record<string, { order: number; depth: number }>> = {};
-	const pagesToPropagatedCss: Record<string, Record<string, Set<string>>> = {};
-
-	const isContentCollectionCache =
-		options.buildOptions.settings.config.output === 'static' &&
-		options.buildOptions.settings.config.experimental.contentCollectionCache;
+	// Map of module Ids (usually something like `/Users/...blog.mdx?astroPropagatedAssets`) to its imported CSS
+	const moduleIdToPropagatedCss: Record<string, Set<string>> = {};
 
 	const cssBuildPlugin: VitePlugin = {
 		name: 'astro:rollup-plugin-build-css',
@@ -89,21 +89,13 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 							return internals.cssModuleToChunkIdMap.get(id)!;
 						}
 
-						for (const [pageInfo] of walkParentInfos(id, {
-							getModuleInfo: meta.getModuleInfo,
-						})) {
-							if (new URL(pageInfo.id, 'file://').searchParams.has(PROPAGATED_ASSET_FLAG)) {
+						const ctx = { getModuleInfo: meta.getModuleInfo };
+						for (const pageInfo of getParentModuleInfos(id, ctx)) {
+							if (hasAssetPropagationFlag(pageInfo.id)) {
 								// Split delayed assets to separate modules
 								// so they can be injected where needed
 								const chunkId = assetName.createNameHash(id, [id]);
 								internals.cssModuleToChunkIdMap.set(id, chunkId);
-								if (isContentCollectionCache) {
-									// TODO: Handle inlining?
-									const propagatedStyles =
-										internals.propagatedStylesMap.get(pageInfo.id) ?? new Set();
-									propagatedStyles.add({ type: 'external', src: chunkId });
-									internals.propagatedStylesMap.set(pageInfo.id, propagatedStyles);
-								}
 								return chunkId;
 							}
 						}
@@ -140,28 +132,12 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 
 				// For this CSS chunk, walk parents until you find a page. Add the CSS to that page.
 				for (const id of Object.keys(chunk.modules)) {
-					for (const [pageInfo, depth, order] of walkParentInfos(
-						id,
-						this,
-						function until(importer) {
-							return new URL(importer, 'file://').searchParams.has(PROPAGATED_ASSET_FLAG);
-						}
-					)) {
-						if (new URL(pageInfo.id, 'file://').searchParams.has(PROPAGATED_ASSET_FLAG)) {
-							for (const parent of walkParentInfos(id, this)) {
-								const parentInfo = parent[0];
-								if (moduleIsTopLevelPage(parentInfo) === false) continue;
-
-								const pageViteID = parentInfo.id;
-								const pageData = getPageDataByViteID(internals, pageViteID);
-								if (pageData === undefined) continue;
-
-								for (const css of meta.importedCss) {
-									const propagatedStyles = (pagesToPropagatedCss[pageData.moduleSpecifier] ??= {});
-									const existingCss = (propagatedStyles[pageInfo.id] ??= new Set());
-
-									existingCss.add(css);
-								}
+					const parentModuleInfos = getParentExtendedModuleInfos(id, this, hasAssetPropagationFlag);
+					for (const { info: pageInfo, depth, order } of parentModuleInfos) {
+						if (hasAssetPropagationFlag(pageInfo.id)) {
+							const propagatedCss = (moduleIdToPropagatedCss[pageInfo.id] ??= new Set());
+							for (const css of meta.importedCss) {
+								propagatedCss.add(css);
 							}
 						} else if (moduleIsTopLevelPage(pageInfo)) {
 							const pageViteID = pageInfo.id;
@@ -169,11 +145,49 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 							if (pageData) {
 								appendCSSToPage(pageData, meta, pagesToCss, depth, order);
 							}
-						} else if (options.target === 'client' && isHoistedScript(internals, pageInfo.id)) {
-							for (const pageData of getPageDatasByHoistedScriptId(internals, pageInfo.id)) {
-								appendCSSToPage(pageData, meta, pagesToCss, -1, order);
+						} else if (options.target === 'client') {
+							// For scripts or hoisted scripts, walk parents until you find a page, and add the CSS to that page.
+							if (buildOptions.settings.config.experimental.directRenderScript) {
+								const pageDatas = internals.pagesByScriptId.get(pageInfo.id)!;
+								if (pageDatas) {
+									for (const pageData of pageDatas) {
+										appendCSSToPage(pageData, meta, pagesToCss, -1, order);
+									}
+								}
+							} else {
+								if (internals.hoistedScriptIdToPagesMap.has(pageInfo.id)) {
+									for (const pageData of getPageDatasByHoistedScriptId(internals, pageInfo.id)) {
+										appendCSSToPage(pageData, meta, pagesToCss, -1, order);
+									}
+								}
 							}
 						}
+					}
+				}
+			}
+		},
+	};
+
+	/**
+	 * This plugin is a port of https://github.com/vitejs/vite/pull/16058. It enables removing unused
+	 * scoped CSS from the bundle if the scoped target (e.g. Astro files) were not bundled.
+	 * Once/If that PR is merged, we can refactor this away, renaming `meta.astroCss` to `meta.vite`.
+	 */
+	const cssScopeToPlugin: VitePlugin = {
+		name: 'astro:rollup-plugin-css-scope-to',
+		renderChunk(_, chunk, __, meta) {
+			for (const id in chunk.modules) {
+				// If this CSS is scoped to its importers exports, check if those importers exports
+				// are rendered in the chunks. If they are not, we can skip bundling this CSS.
+				const modMeta = this.getModuleInfo(id)?.meta as AstroPluginCssMetadata | undefined;
+				const cssScopeTo = modMeta?.astroCss?.cssScopeTo;
+				if (cssScopeTo && !isCssScopeToRendered(cssScopeTo, Object.values(meta.chunks))) {
+					// If this CSS is not used, delete it from the chunk modules so that Vite is unable
+					// to trace that it's used
+					delete chunk.modules[id];
+					const moduleIdsIndex = chunk.moduleIds.indexOf(id);
+					if (moduleIdsIndex > -1) {
+						chunk.moduleIds.splice(moduleIdsIndex, 1);
 					}
 				}
 			}
@@ -195,7 +209,7 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 				(chunk) => chunk.type === 'asset' && chunk.name === 'style.css'
 			);
 			if (cssChunk === undefined) return;
-			for (const pageData of eachPageData(internals)) {
+			for (const pageData of internals.pagesByKeys.values()) {
 				const cssToInfoMap = (pagesToCss[pageData.moduleSpecifier] ??= {});
 				cssToInfoMap[cssChunk.fileName] = { depth: -1, order: -1 };
 			}
@@ -232,41 +246,29 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 					? { type: 'inline', content: stylesheet.source }
 					: { type: 'external', src: stylesheet.fileName };
 
-				const pages = Array.from(eachPageData(internals));
 				let sheetAddedToPage = false;
 
-				pages.forEach((pageData) => {
+				internals.pagesByKeys.forEach((pageData) => {
 					const orderingInfo = pagesToCss[pageData.moduleSpecifier]?.[stylesheet.fileName];
 					if (orderingInfo !== undefined) {
 						pageData.styles.push({ ...orderingInfo, sheet });
 						sheetAddedToPage = true;
-						return;
 					}
-
-					const propagatedPaths = pagesToPropagatedCss[pageData.moduleSpecifier];
-					if (propagatedPaths === undefined) return;
-					Object.entries(propagatedPaths).forEach(([pageInfoId, css]) => {
-						// return early if sheet does not need to be propagated
-						if (css.has(stylesheet.fileName) !== true) return;
-
-						// return early if the stylesheet needing propagation has already been included
-						if (pageData.styles.some((s) => s.sheet === sheet)) return;
-
-						let propagatedStyles: Set<StylesheetAsset>;
-						if (isContentCollectionCache) {
-							propagatedStyles =
-								internals.propagatedStylesMap.get(pageInfoId) ??
-								internals.propagatedStylesMap.set(pageInfoId, new Set()).get(pageInfoId)!;
-						} else {
-							propagatedStyles =
-								pageData.propagatedStyles.get(pageInfoId) ??
-								pageData.propagatedStyles.set(pageInfoId, new Set()).get(pageInfoId)!;
-						}
-
-						propagatedStyles.add(sheet);
-						sheetAddedToPage = true;
-					});
 				});
+
+				// Apply `moduleIdToPropagatedCss` information to `internals.propagatedStylesMap`.
+				// NOTE: It's pretty much a copy over to `internals.propagatedStylesMap` as it should be
+				// completely empty. The whole propagation handling could be better refactored in the future.
+				for (const moduleId in moduleIdToPropagatedCss) {
+					if (!moduleIdToPropagatedCss[moduleId].has(stylesheet.fileName)) continue;
+					let propagatedStyles = internals.propagatedStylesMap.get(moduleId);
+					if (!propagatedStyles) {
+						propagatedStyles = new Set();
+						internals.propagatedStylesMap.set(moduleId, propagatedStyles);
+					}
+					propagatedStyles.add(sheet);
+					sheetAddedToPage = true;
+				}
 
 				if (toBeInlined && sheetAddedToPage) {
 					// CSS is already added to all used pages, we can delete it from the bundle
@@ -283,7 +285,7 @@ function rollupPluginAstroBuildCSS(options: PluginOptions): VitePlugin[] {
 		},
 	};
 
-	return [cssBuildPlugin, singleCssPlugin, inlineStylesheetsPlugin];
+	return [cssBuildPlugin, cssScopeToPlugin, singleCssPlugin, inlineStylesheetsPlugin];
 }
 
 /***** UTILITY FUNCTIONS *****/
@@ -293,7 +295,7 @@ function* getParentClientOnlys(
 	ctx: { getModuleInfo: GetModuleInfo },
 	internals: BuildInternals
 ): Generator<PageBuildData, void, unknown> {
-	for (const [info] of walkParentInfos(id, ctx)) {
+	for (const info of getParentModuleInfos(id, ctx)) {
 		yield* getPageDatasByClientOnlyID(internals, info.id);
 	}
 }
@@ -330,4 +332,26 @@ function appendCSSToPage(
 			cssToInfoRecord[importedCssImport] = { depth, order };
 		}
 	}
+}
+
+/**
+ * `cssScopeTo` is a map of `importer`s to its `export`s. This function iterate each `cssScopeTo` entries
+ * and check if the `importer` and its `export`s exists in the final chunks. If at least one matches,
+ * `cssScopeTo` is considered "rendered" by Rollup and we return true.
+ */
+function isCssScopeToRendered(
+	cssScopeTo: Record<string, string[]>,
+	chunks: Rollup.RenderedChunk[]
+) {
+	for (const moduleId in cssScopeTo) {
+		const exports = cssScopeTo[moduleId];
+		// Find the chunk that renders this `moduleId` and get the rendered module
+		const renderedModule = chunks.find((c) => c.moduleIds.includes(moduleId))?.modules[moduleId];
+		// Return true if `renderedModule` exists and one of its exports is rendered
+		if (renderedModule?.renderedExports.some((e) => exports.includes(e))) {
+			return true;
+		}
+	}
+
+	return false;
 }

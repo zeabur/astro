@@ -1,5 +1,6 @@
 import type { AstroSettings, ComponentInstance, RouteData } from '../@types/astro.js';
 import { RedirectComponentInstance, routeIsRedirect } from '../core/redirects/index.js';
+import { routeComparator } from '../core/routing/priority.js';
 import type { DevPipeline } from '../vite-plugin-astro-server/pipeline.js';
 import { getPrerenderStatus } from './metadata.js';
 
@@ -19,7 +20,9 @@ export async function getSortedPreloadedMatches({
 			matches,
 			settings,
 		})
-	).sort((a, b) => prioritizePrerenderedMatchesComparator(a.route, b.route));
+	)
+		.sort((a, b) => routeComparator(a.route, b.route))
+		.sort((a, b) => prioritizePrerenderedMatchesComparator(a.route, b.route));
 }
 
 type PreloadAndSetPrerenderStatusParams = {
@@ -51,7 +54,7 @@ async function preloadAndSetPrerenderStatus({
 			continue;
 		}
 
-		const preloadedComponent = await pipeline.preload(filePath);
+		const preloadedComponent = await pipeline.preload(route, filePath);
 
 		// gets the prerender metadata set by the `astro:scanner` vite plugin
 		const prerenderStatus = getPrerenderStatus({

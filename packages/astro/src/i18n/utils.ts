@@ -1,4 +1,4 @@
-import type { AstroConfig, AstroUserConfig, Locales } from '../@types/astro.js';
+import type { AstroConfig, Locales } from '../@types/astro.js';
 import { normalizeTheLocale, toCodes } from './index.js';
 
 type BrowserLocale = {
@@ -71,11 +71,7 @@ function sortAndFilterLocales(browserLocaleList: BrowserLocale[], locales: Local
 		})
 		.sort((a, b) => {
 			if (a.qualityValue && b.qualityValue) {
-				if (a.qualityValue > b.qualityValue) {
-					return -1;
-				} else if (a.qualityValue < b.qualityValue) {
-					return 1;
-				}
+				return Math.sign(b.qualityValue - a.qualityValue);
 			}
 			return 0;
 		});
@@ -152,12 +148,7 @@ export function computePreferredLocaleList(request: Request, locales: Locales): 
 	return result;
 }
 
-export function computeCurrentLocale(
-	pathname: string,
-	locales: Locales,
-	routingStrategy: RoutingStrategies | undefined,
-	defaultLocale: string | undefined
-): undefined | string {
+export function computeCurrentLocale(pathname: string, locales: Locales): undefined | string {
 	for (const segment of pathname.split('/')) {
 		for (const locale of locales) {
 			if (typeof locale === 'string') {
@@ -180,46 +171,45 @@ export function computeCurrentLocale(
 			}
 		}
 	}
-
-	if (
-		routingStrategy === 'pathname-prefix-other-locales' ||
-		routingStrategy === 'domains-prefix-other-locales'
-	) {
-		return defaultLocale;
-	}
-	return undefined;
 }
 
 export type RoutingStrategies =
+	| 'manual'
 	| 'pathname-prefix-always'
 	| 'pathname-prefix-other-locales'
 	| 'pathname-prefix-always-no-redirect'
 	| 'domains-prefix-always'
 	| 'domains-prefix-other-locales'
 	| 'domains-prefix-always-no-redirect';
-export function toRoutingStrategy(i18n: NonNullable<AstroConfig['i18n']>) {
-	let { routing, domains } = i18n;
+export function toRoutingStrategy(
+	routing: NonNullable<AstroConfig['i18n']>['routing'],
+	domains: NonNullable<AstroConfig['i18n']>['domains']
+) {
 	let strategy: RoutingStrategies;
 	const hasDomains = domains ? Object.keys(domains).length > 0 : false;
-	if (!hasDomains) {
-		if (routing?.prefixDefaultLocale === true) {
-			if (routing.redirectToDefaultLocale) {
-				strategy = 'pathname-prefix-always';
-			} else {
-				strategy = 'pathname-prefix-always-no-redirect';
-			}
-		} else {
-			strategy = 'pathname-prefix-other-locales';
-		}
+	if (routing === 'manual') {
+		strategy = 'manual';
 	} else {
-		if (routing?.prefixDefaultLocale === true) {
-			if (routing.redirectToDefaultLocale) {
-				strategy = 'domains-prefix-always';
+		if (!hasDomains) {
+			if (routing?.prefixDefaultLocale === true) {
+				if (routing.redirectToDefaultLocale) {
+					strategy = 'pathname-prefix-always';
+				} else {
+					strategy = 'pathname-prefix-always-no-redirect';
+				}
 			} else {
-				strategy = 'domains-prefix-always-no-redirect';
+				strategy = 'pathname-prefix-other-locales';
 			}
 		} else {
-			strategy = 'domains-prefix-other-locales';
+			if (routing?.prefixDefaultLocale === true) {
+				if (routing.redirectToDefaultLocale) {
+					strategy = 'domains-prefix-always';
+				} else {
+					strategy = 'domains-prefix-always-no-redirect';
+				}
+			} else {
+				strategy = 'domains-prefix-other-locales';
+			}
 		}
 	}
 

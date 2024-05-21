@@ -1,10 +1,26 @@
 import type { Properties } from 'hast';
-import { bundledLanguages, createCssVariablesTheme, getHighlighter } from 'shikiji';
+import {
+	type BundledLanguage,
+	createCssVariablesTheme,
+	getHighlighter,
+	isSpecialLang,
+} from 'shiki';
 import { visit } from 'unist-util-visit';
 import type { ShikiConfig } from './types.js';
 
 export interface ShikiHighlighter {
-	highlight(code: string, lang?: string, options?: { inline?: boolean }): string;
+	highlight(
+		code: string,
+		lang?: string,
+		options?: {
+			inline?: boolean;
+			attributes?: Record<string, string>;
+			/**
+			 * Raw `meta` information to be used by Shiki transformers
+			 */
+			meta?: string;
+		}
+	): Promise<string>;
 }
 
 // TODO: Remove this special replacement in Astro 5
@@ -25,27 +41,31 @@ const cssVariablesTheme = () =>
 export async function createShikiHighlighter({
 	langs = [],
 	theme = 'github-dark',
-	experimentalThemes = {},
+	themes = {},
 	wrap = false,
 	transformers = [],
 }: ShikiConfig = {}): Promise<ShikiHighlighter> {
-	const themes = experimentalThemes;
-
 	theme = theme === 'css-variables' ? cssVariablesTheme() : theme;
 
 	const highlighter = await getHighlighter({
-		langs: langs.length ? langs : Object.keys(bundledLanguages),
+		langs: ['plaintext', ...langs],
 		themes: Object.values(themes).length ? Object.values(themes) : [theme],
 	});
 
-	const loadedLanguages = highlighter.getLoadedLanguages();
-
 	return {
-		highlight(code, lang = 'plaintext', options) {
-			if (lang !== 'plaintext' && !loadedLanguages.includes(lang)) {
-				// eslint-disable-next-line no-console
-				console.warn(`[Shiki] The language "${lang}" doesn't exist, falling back to "plaintext".`);
-				lang = 'plaintext';
+		async highlight(code, lang = 'plaintext', options) {
+			const loadedLanguages = highlighter.getLoadedLanguages();
+
+			if (!isSpecialLang(lang) && !loadedLanguages.includes(lang)) {
+				try {
+					await highlighter.loadLanguage(lang as BundledLanguage);
+				} catch (_err) {
+					// eslint-disable-next-line no-console
+					console.warn(
+						`[Shiki] The language "${lang}" doesn't exist, falling back to "plaintext".`
+					);
+					lang = 'plaintext';
+				}
 			}
 
 			const themeOptions = Object.values(themes).length ? { themes } : { theme };
@@ -54,6 +74,10 @@ export async function createShikiHighlighter({
 			return highlighter.codeToHtml(code, {
 				...themeOptions,
 				lang,
+				// NOTE: while we can spread `options.attributes` here so that Shiki can auto-serialize this as rendered
+				// attributes on the top-level tag, it's not clear whether it is fine to pass all attributes as meta, as
+				// they're technically not meta, nor parsed from Shiki's `parseMetaString` API.
+				meta: options?.meta ? { __raw: options?.meta } : undefined,
 				transformers: [
 					{
 						pre(node) {
@@ -62,11 +86,25 @@ export async function createShikiHighlighter({
 								node.tagName = 'code';
 							}
 
-							const classValue = normalizePropAsString(node.properties.class) ?? '';
-							const styleValue = normalizePropAsString(node.properties.style) ?? '';
+							const {
+								class: attributesClass,
+								style: attributesStyle,
+								...rest
+							} = options?.attributes ?? {};
+							Object.assign(node.properties, rest);
+
+							const classValue =
+								(normalizePropAsString(node.properties.class) ?? '') +
+								(attributesClass ? ` ${attributesClass}` : '');
+							const styleValue =
+								(normalizePropAsString(node.properties.style) ?? '') +
+								(attributesStyle ? `; ${attributesStyle}` : '');
 
 							// Replace "shiki" class naming with "astro-code"
 							node.properties.class = classValue.replace(/shiki/g, 'astro-code');
+
+							// Add data-language attribute
+							node.properties.dataLanguage = lang;
 
 							// Handle code wrapping
 							// if wrap=null, do nothing.
@@ -106,11 +144,10 @@ export async function createShikiHighlighter({
 							}
 						},
 						root(node) {
-							if (Object.values(experimentalThemes).length) {
+							if (Object.values(themes).length) {
 								return;
 							}
 
-							// theme.id for shiki -> shikiji compat
 							const themeName = typeof theme === 'string' ? theme : theme.name;
 							if (themeName === 'css-variables') {
 								// Replace special color tokens to CSS variables
@@ -133,10 +170,6 @@ function normalizePropAsString(value: Properties[string]): string | null {
 	return Array.isArray(value) ? value.join(' ') : (value as string | null);
 }
 
-/**
- * shiki -> shikiji compat as we need to manually replace it
- * @internal Exported for error overlay use only
- */
-export function replaceCssVariables(str: string) {
+function replaceCssVariables(str: string) {
 	return str.replace(COLOR_REPLACEMENT_REGEX, (match) => ASTRO_COLOR_REPLACEMENTS[match] || match);
 }

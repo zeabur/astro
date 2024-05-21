@@ -9,8 +9,6 @@
  * Adapted from React’s TypeScript definition from DefinitelyTyped.
  * @see https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts
  */
-// BUG! Prettier 3.0 removes `declare`: https://github.com/prettier/prettier/issues/15207
-// prettier-ignore
 declare namespace astroHTML.JSX {
 	export type Child = Node | Node[] | string | number | boolean | null | undefined | unknown;
 	export type Children = Child | Child[];
@@ -526,7 +524,7 @@ declare namespace astroHTML.JSX {
 			| 'search'
 			| 'send'
 			| undefined
-		| null;
+			| null;
 		exportparts?: string | undefined | null;
 		hidden?: boolean | string | undefined | null;
 		id?: string | undefined | null;
@@ -584,6 +582,9 @@ declare namespace astroHTML.JSX {
 		results?: number | string | undefined | null;
 		security?: string | undefined | null;
 		unselectable?: 'on' | 'off' | undefined | null; // Internet Explorer
+
+		// Allow data- attribute
+		[key: `data-${string}`]: any;
 	}
 
 	type HTMLAttributeReferrerPolicy =
@@ -604,6 +605,7 @@ declare namespace astroHTML.JSX {
 		href?: string | URL | undefined | null;
 		hreflang?: string | undefined | null;
 		media?: string | undefined | null;
+		name?: string | undefined | null;
 		ping?: string | undefined | null;
 		rel?: string | undefined | null;
 		target?: HTMLAttributeAnchorTarget | undefined | null;
@@ -648,6 +650,7 @@ declare namespace astroHTML.JSX {
 		type?: 'submit' | 'reset' | 'button' | undefined | null;
 		value?: string | string[] | number | undefined | null;
 		popovertarget?: string | undefined | null;
+		popovertargetaction?: 'hide' | 'show' | 'toggle' | undefined | null;
 	}
 
 	interface CanvasHTMLAttributes extends HTMLAttributes {
@@ -814,6 +817,7 @@ declare namespace astroHTML.JSX {
 		value?: string | string[] | number | undefined | null;
 		width?: number | string | undefined | null;
 		popovertarget?: string | undefined | null;
+		popovertargetaction?: 'hide' | 'show' | 'toggle' | undefined | null;
 	}
 
 	interface KeygenHTMLAttributes extends HTMLAttributes {
@@ -870,6 +874,8 @@ declare namespace astroHTML.JSX {
 		playsinline?: boolean | string | undefined | null;
 		preload?: string | undefined | null;
 		src?: string | undefined | null;
+		// https://www.w3.org/TR/remote-playback/#the-disableremoteplayback-attribute
+		disableRemotePlayback?: boolean | string | undefined | null;
 	}
 
 	interface MetaHTMLAttributes extends HTMLAttributes {
@@ -1344,6 +1350,9 @@ declare namespace astroHTML.JSX {
 		yChannelSelector?: string | undefined | null;
 		z?: number | string | undefined | null;
 		zoomAndPan?: string | undefined | null;
+
+		// Allow data- attribute
+		[key: `data-${string}`]: any;
 	}
 
 	interface DefinedIntrinsicElements {

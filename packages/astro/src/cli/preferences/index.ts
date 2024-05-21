@@ -7,7 +7,6 @@ import { bgGreen, black, bold, dim, yellow } from 'kleur/colors';
 
 import { formatWithOptions } from 'node:util';
 import dlv from 'dlv';
-// @ts-expect-error flattie types are mispackaged
 import { flattie } from 'flattie';
 import { resolveConfig } from '../../core/config/config.js';
 import { createSettings } from '../../core/config/settings.js';
@@ -125,7 +124,7 @@ interface SubcommandOptions {
 	json?: boolean;
 }
 
-// Default `location` to "project" to avoid reading default preferencesa
+// Default `location` to "project" to avoid reading default preferences
 async function getPreference(
 	settings: AstroSettings,
 	key: PreferenceKey,
@@ -321,7 +320,7 @@ const chars = {
 	bottomRight: '╯',
 };
 
-// this is only used to deternine the column width
+// this is only used to determine the column width
 function annotatedFormat(mv: AnnotatedValue) {
 	return mv.annotation ? `${mv.value} ${mv.annotation}` : mv.value.toString();
 }

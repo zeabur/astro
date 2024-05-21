@@ -92,3 +92,15 @@ export function isRemotePath(src: string) {
 export function slash(path: string) {
 	return path.replace(/\\/g, '/');
 }
+
+export function fileExtension(path: string) {
+	const ext = path.split('.').pop();
+	return ext !== path ? `.${ext}` : '';
+}
+
+export function removeBase(path: string, base: string) {
+	if (path.startsWith(base)) {
+		return path.slice(removeTrailingForwardSlash(base).length);
+	}
+	return path;
+}

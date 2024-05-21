@@ -1,11 +1,11 @@
 import type {
-	RehypePlugin,
-	RemarkPlugin,
-	RemarkRehype,
 	ShikiConfig,
+	RehypePlugin as _RehypePlugin,
+	RemarkPlugin as _RemarkPlugin,
+	RemarkRehype as _RemarkRehype,
 } from '@astrojs/markdown-remark';
 import { markdownConfigDefaults } from '@astrojs/markdown-remark';
-import { type BuiltinTheme, bundledThemes } from 'shikiji';
+import { type BuiltinTheme, bundledThemes } from 'shiki';
 import type { AstroUserConfig, ViteUserConfig } from '../../@types/astro.js';
 
 import type { OutgoingHttpHeaders } from 'node:http';
@@ -14,14 +14,36 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { appendForwardSlash, prependForwardSlash, removeTrailingForwardSlash } from '../path.js';
 
-// This import is required to appease TypeScript!
-// See https://github.com/withastro/astro/pull/8762
-import 'mdast-util-to-hast';
-import 'shikiji-core';
+// The below types are required boilerplate to workaround a Zod issue since v3.21.2. Since that version,
+// Zod's compiled TypeScript would "simplify" certain values to their base representation, causing references
+// to transitive dependencies that Astro don't depend on (e.g. `mdast-util-to-hast` or `remark-rehype`). For example:
+//
+// ```ts
+// // input
+// type Foo = { bar: string };
+// export const value: Foo;
+//
+// // output
+// export const value: { bar: string }; // <-- `Foo` is gone
+// ```
+//
+// The types below will "complexify" the types so that TypeScript would not simplify them. This way it will
+// reference the complex type directly, instead of referencing non-existent transitive dependencies.
+//
+// Also, make sure to not index the complexified type, as it would return a simplified value type, which goes
+// back to the issue again. The complexified type should be the base representation that we want to expose.
 
-type ShikiLangs = NonNullable<ShikiConfig['langs']>;
-type ShikiTheme = NonNullable<ShikiConfig['theme']>;
-type ShikiTransformers = NonNullable<ShikiConfig['transformers']>;
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+interface ComplexifyUnionObj {}
+type ComplexifyWithUnion<T> = T & ComplexifyUnionObj;
+type ComplexifyWithOmit<T> = Omit<T, '__nonExistent'>;
+
+type ShikiLang = ComplexifyWithUnion<NonNullable<ShikiConfig['langs']>[number]>;
+type ShikiTheme = ComplexifyWithUnion<NonNullable<ShikiConfig['theme']>>;
+type ShikiTransformer = ComplexifyWithUnion<NonNullable<ShikiConfig['transformers']>[number]>;
+type RehypePlugin = ComplexifyWithUnion<_RehypePlugin>;
+type RemarkPlugin = ComplexifyWithUnion<_RemarkPlugin>;
+type RemarkRehype = ComplexifyWithOmit<_RemarkRehype>;
 
 const ASTRO_CONFIG_DEFAULTS = {
 	root: '.',
@@ -58,11 +80,15 @@ const ASTRO_CONFIG_DEFAULTS = {
 	legacy: {},
 	redirects: {},
 	experimental: {
-		optimizeHoistedScript: false,
+		actions: false,
+		directRenderScript: false,
 		contentCollectionCache: false,
+		contentCollectionJsonSchema: false,
 		clientPrerender: false,
 		globalRoutePriority: false,
 		i18nDomains: false,
+		security: {},
+		rewriting: false,
 	},
 } satisfies AstroUserConfig & { server: { open: boolean } };
 
@@ -133,7 +159,23 @@ export const AstroConfigSchema = z.object({
 				.default(ASTRO_CONFIG_DEFAULTS.build.server)
 				.transform((val) => new URL(val)),
 			assets: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.assets),
-			assetsPrefix: z.string().optional(),
+			assetsPrefix: z
+				.string()
+				.optional()
+				.or(z.object({ fallback: z.string() }).and(z.record(z.string())).optional())
+				.refine(
+					(value) => {
+						if (value && typeof value !== 'string') {
+							if (!value.fallback) {
+								return false;
+							}
+						}
+						return true;
+					},
+					{
+						message: 'The `fallback` is mandatory when defining the option as an object.',
+					}
+				),
 			serverEntry: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.serverEntry),
 			redirects: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.build.redirects),
 			inlineStylesheets: z
@@ -246,11 +288,11 @@ export const AstroConfigSchema = z.object({
 			shikiConfig: z
 				.object({
 					langs: z
-						.custom<ShikiLangs[number]>()
+						.custom<ShikiLang>()
 						.array()
 						.transform((langs) => {
 							for (const lang of langs) {
-								// shiki -> shikiji compat
+								// shiki 1.0 compat
 								if (typeof lang === 'object') {
 									// `id` renamed to `name` (always override)
 									if ((lang as any).id) {
@@ -269,17 +311,28 @@ export const AstroConfigSchema = z.object({
 						.enum(Object.keys(bundledThemes) as [BuiltinTheme, ...BuiltinTheme[]])
 						.or(z.custom<ShikiTheme>())
 						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.theme!),
-					experimentalThemes: z
+					themes: z
 						.record(
 							z
 								.enum(Object.keys(bundledThemes) as [BuiltinTheme, ...BuiltinTheme[]])
 								.or(z.custom<ShikiTheme>())
 						)
-						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.experimentalThemes!),
+						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.themes!),
 					wrap: z.boolean().or(z.null()).default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.wrap!),
 					transformers: z
-						.custom<ShikiTransformers[number]>()
+						.custom<ShikiTransformer>()
 						.array()
+						.transform((transformers) => {
+							for (const transformer of transformers) {
+								// When updating shikiji to shiki, the `token` property was renamed to `span`.
+								// We apply the compat here for now until the next Astro major.
+								// TODO: Remove this in Astro 5.0
+								if ((transformer as any).token && !('span' in transformer)) {
+									transformer.span = (transformer as any).token;
+								}
+							}
+							return transformers;
+						})
 						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.transformers!),
 				})
 				.default({}),
@@ -303,7 +356,6 @@ export const AstroConfigSchema = z.object({
 				.default(ASTRO_CONFIG_DEFAULTS.markdown.rehypePlugins),
 			remarkRehype: z
 				.custom<RemarkRehype>((data) => data instanceof Object && !Array.isArray(data))
-				.optional()
 				.default(ASTRO_CONFIG_DEFAULTS.markdown.remarkRehype),
 			gfm: z.boolean().default(ASTRO_CONFIG_DEFAULTS.markdown.gfm),
 			smartypants: z.boolean().default(ASTRO_CONFIG_DEFAULTS.markdown.smartypants),
@@ -337,26 +389,30 @@ export const AstroConfigSchema = z.object({
 					.optional(),
 				fallback: z.record(z.string(), z.string()).optional(),
 				routing: z
-					.object({
-						prefixDefaultLocale: z.boolean().default(false),
-						redirectToDefaultLocale: z.boolean().default(true),
-						strategy: z.enum(['pathname']).default('pathname'),
-					})
-					.default({})
-					.refine(
-						({ prefixDefaultLocale, redirectToDefaultLocale }) => {
-							return !(prefixDefaultLocale === false && redirectToDefaultLocale === false);
-						},
-						{
-							message:
-								'The option `i18n.redirectToDefaultLocale` is only useful when the `i18n.prefixDefaultLocale` is set to `true`. Remove the option `i18n.redirectToDefaultLocale`, or change its value to `true`.',
-						}
-					),
+					.literal('manual')
+					.or(
+						z
+							.object({
+								prefixDefaultLocale: z.boolean().optional().default(false),
+								redirectToDefaultLocale: z.boolean().optional().default(true),
+							})
+							.refine(
+								({ prefixDefaultLocale, redirectToDefaultLocale }) => {
+									return !(prefixDefaultLocale === false && redirectToDefaultLocale === false);
+								},
+								{
+									message:
+										'The option `i18n.redirectToDefaultLocale` is only useful when the `i18n.prefixDefaultLocale` is set to `true`. Remove the option `i18n.redirectToDefaultLocale`, or change its value to `true`.',
+								}
+							)
+					)
+					.optional()
+					.default({}),
 			})
 			.optional()
 			.superRefine((i18n, ctx) => {
 				if (i18n) {
-					const { defaultLocale, locales: _locales, fallback, domains, routing } = i18n;
+					const { defaultLocale, locales: _locales, fallback, domains } = i18n;
 					const locales = _locales.map((locale) => {
 						if (typeof locale === 'string') {
 							return locale;
@@ -439,14 +495,19 @@ export const AstroConfigSchema = z.object({
 	),
 	experimental: z
 		.object({
-			optimizeHoistedScript: z
+			actions: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.experimental.actions),
+			directRenderScript: z
 				.boolean()
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.optimizeHoistedScript),
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.directRenderScript),
 			contentCollectionCache: z
 				.boolean()
 				.optional()
 				.default(ASTRO_CONFIG_DEFAULTS.experimental.contentCollectionCache),
+			contentCollectionJsonSchema: z
+				.boolean()
+				.optional()
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.contentCollectionJsonSchema),
 			clientPrerender: z
 				.boolean()
 				.optional()
@@ -455,7 +516,19 @@ export const AstroConfigSchema = z.object({
 				.boolean()
 				.optional()
 				.default(ASTRO_CONFIG_DEFAULTS.experimental.globalRoutePriority),
+			security: z
+				.object({
+					csrfProtection: z
+						.object({
+							origin: z.boolean().default(false),
+						})
+						.optional()
+						.default({}),
+				})
+				.optional()
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.security),
 			i18nDomains: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.experimental.i18nDomains),
+			rewriting: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.experimental.rewriting),
 		})
 		.strict(
 			`Invalid or outdated experimental feature.\nCheck for incorrect spelling or outdated Astro version.\nSee https://docs.astro.build/en/reference/configuration-reference/#experimental-flags for a list of all current experiments.`
@@ -508,7 +581,23 @@ export function createRelativeSchema(cmd: string, fileProtocolRoot: string) {
 					.default(ASTRO_CONFIG_DEFAULTS.build.server)
 					.transform((val) => resolveDirAsUrl(val, fileProtocolRoot)),
 				assets: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.assets),
-				assetsPrefix: z.string().optional(),
+				assetsPrefix: z
+					.string()
+					.optional()
+					.or(z.object({ fallback: z.string() }).and(z.record(z.string())).optional())
+					.refine(
+						(value) => {
+							if (value && typeof value !== 'string') {
+								if (!value.fallback) {
+									return false;
+								}
+							}
+							return true;
+						},
+						{
+							message: 'The `fallback` is mandatory when defining the option as an object.',
+						}
+					),
 				serverEntry: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.serverEntry),
 				redirects: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.build.redirects),
 				inlineStylesheets: z

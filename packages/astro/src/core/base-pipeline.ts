@@ -1,5 +1,7 @@
 import type {
+	ComponentInstance,
 	MiddlewareHandler,
+	RewritePayload,
 	RouteData,
 	RuntimeMode,
 	SSRLoadedRenderer,
@@ -38,6 +40,7 @@ export abstract class Pipeline {
 		 */
 		readonly adapterName = manifest.adapterName,
 		readonly clientDirectives = manifest.clientDirectives,
+		readonly inlinedScripts = manifest.inlinedScripts,
 		readonly compressHTML = manifest.compressHTML,
 		readonly i18n = manifest.i18n,
 		readonly middleware = manifest.middleware,
@@ -45,15 +48,39 @@ export abstract class Pipeline {
 		/**
 		 * Used for `Astro.site`.
 		 */
-		readonly site = manifest.site
+		readonly site = manifest.site ? new URL(manifest.site) : undefined
 	) {
-		this.internalMiddleware = [
-			createI18nMiddleware(i18n, manifest.base, manifest.trailingSlash, manifest.buildFormat),
-		];
+		this.internalMiddleware = [];
+		// We do use our middleware only if the user isn't using the manual setup
+		if (i18n?.strategy !== 'manual') {
+			this.internalMiddleware.push(
+				createI18nMiddleware(i18n, manifest.base, manifest.trailingSlash, manifest.buildFormat)
+			);
+		}
 	}
 
 	abstract headElements(routeData: RouteData): Promise<HeadElements> | HeadElements;
 	abstract componentMetadata(routeData: RouteData): Promise<SSRResult['componentMetadata']> | void;
+
+	/**
+	 * It attempts to retrieve the `RouteData` that matches the input `url`, and the component that belongs to the `RouteData`.
+	 *
+	 * ## Errors
+	 *
+	 * - if not `RouteData` is found
+	 *
+	 * @param {RewritePayload} rewritePayload
+	 */
+	abstract tryRewrite(
+		rewritePayload: RewritePayload,
+		request: Request
+	): Promise<[RouteData, ComponentInstance]>;
+
+	/**
+	 * Tells the pipeline how to retrieve a component give a `RouteData`
+	 * @param routeData
+	 */
+	abstract getComponentByRoute(routeData: RouteData): Promise<ComponentInstance>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface

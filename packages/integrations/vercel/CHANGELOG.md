@@ -1,5 +1,81 @@
 # @astrojs/vercel
 
+## 7.6.0
+
+### Minor Changes
+
+- [#10761](https://github.com/withastro/astro/pull/10761) [`f0acd30`](https://github.com/withastro/astro/commit/f0acd30a12c380830884108f7cad67a31d879339) Thanks [@ematipico](https://github.com/ematipico)! - Implements the vercel skew protection
+
+## 7.5.4
+
+### Patch Changes
+
+- [#10833](https://github.com/withastro/astro/pull/10833) [`8d5f3e8`](https://github.com/withastro/astro/commit/8d5f3e8656027023f9fda51c66b0213ffe16d3a5) Thanks [@renovate](https://github.com/apps/renovate)! - Updates `esbuild` dependency to v0.20. This should not affect projects in most cases.
+
+## 7.5.3
+
+### Patch Changes
+
+- [#10756](https://github.com/withastro/astro/pull/10756) [`c75ededdb401cfa55e1ad2682d5e95494f49604e`](https://github.com/withastro/astro/commit/c75ededdb401cfa55e1ad2682d5e95494f49604e) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes `widths` and `densities` not working when using Vercel's Image Optimization.
+
+  Note that you still need to make sure that the widths you're outputting are enabled in [the `imageConfig` property of the Vercel adapter](https://docs.astro.build/en/guides/integrations-guide/vercel/#imagesconfig) in order for these properties to work.
+
+## 7.5.2
+
+### Patch Changes
+
+- [#10611](https://github.com/withastro/astro/pull/10611) [`a9a3694a98060be9a33045bb0fcf92ccf1acff6f`](https://github.com/withastro/astro/commit/a9a3694a98060be9a33045bb0fcf92ccf1acff6f) Thanks [@jacobdalamb](https://github.com/jacobdalamb)! - Updates the supported version of Node.js
+
+## 7.5.1
+
+### Patch Changes
+
+- [#10609](https://github.com/withastro/astro/pull/10609) [`31590d44ef8b7c96a757e9b835144d57d767383c`](https://github.com/withastro/astro/commit/31590d44ef8b7c96a757e9b835144d57d767383c) Thanks [@matthewp](https://github.com/matthewp)! - Move nft warnings behind verbose logging
+
+## 7.5.0
+
+### Minor Changes
+
+- [#10513](https://github.com/withastro/astro/pull/10513) [`a573cc199a00d35410197ba4117c97764a984dc0`](https://github.com/withastro/astro/commit/a573cc199a00d35410197ba4117c97764a984dc0) Thanks [@tk04](https://github.com/tk04)! - The `isr.exclude` configuration can now include routes with dynamic and spread parameters.
+  ```ts
+  export default defineConfig({
+      adapter: vercel({
+          isr: {
+              exclude: [
+                  "/blog/[title]"
+                  "/api/[...slug]",
+              ]
+          }
+      })
+  })
+  ```
+
+## 7.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`20463a6c1e1271d8dc3cb0ab3419ee5c72abd218`](https://github.com/withastro/astro/commit/20463a6c1e1271d8dc3cb0ab3419ee5c72abd218)]:
+  - @astrojs/internal-helpers@0.4.0
+
+## 7.4.0
+
+### Minor Changes
+
+- [#10476](https://github.com/withastro/astro/pull/10476) [`cfbaa8a767b8794c2dcd8e164672195378be396a`](https://github.com/withastro/astro/commit/cfbaa8a767b8794c2dcd8e164672195378be396a) Thanks [@lilnasy](https://github.com/lilnasy)! - The special-case handling of `src/vercel-edge-middleware.js` file is now deprecated. This file allowed you to access the edge runtime's `RequestContext` object, and create the middleware `locals` from its fields. However, this object includes only one field - the `waitUntil()` function - which is now available directly as `ctx.locals.vercel.edge.waitUntil()`.
+
+## 7.3.6
+
+### Patch Changes
+
+- Updated dependencies [[`1ea0a25b94125e4f6f2ac82b42f638e22d7bdffd`](https://github.com/withastro/astro/commit/1ea0a25b94125e4f6f2ac82b42f638e22d7bdffd)]:
+  - @astrojs/internal-helpers@0.3.0
+
+## 7.3.5
+
+### Patch Changes
+
+- [#10336](https://github.com/withastro/astro/pull/10336) [`f2e60a96754ed1d86001fe4d5d3a0c0ef657408d`](https://github.com/withastro/astro/commit/f2e60a96754ed1d86001fe4d5d3a0c0ef657408d) Thanks [@FredKSchott](https://github.com/FredKSchott)! - Fixes an issue that was preventing the use of `sharp` in some cases and causing a runtime error
+
 ## 7.3.4
 
 ### Patch Changes

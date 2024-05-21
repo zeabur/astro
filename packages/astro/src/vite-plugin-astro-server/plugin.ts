@@ -9,6 +9,7 @@ import { AstroError, AstroErrorData } from '../core/errors/index.js';
 import { patchOverlay } from '../core/errors/overlay.js';
 import type { Logger } from '../core/logger/core.js';
 import { createViteLoader } from '../core/module-loader/index.js';
+import { ensure404Route } from '../core/routing/astro-designed-error-pages.js';
 import { createRouteManifest } from '../core/routing/index.js';
 import { toRoutingStrategy } from '../i18n/utils.js';
 import { baseMiddleware } from './base.js';
@@ -34,8 +35,10 @@ export default function createVitePluginAstroServer({
 		configureServer(viteServer) {
 			const loader = createViteLoader(viteServer);
 			const manifest = createDevelopmentManifest(settings);
-			const pipeline = DevPipeline.create({ loader, logger, manifest, settings });
-			let manifestData: ManifestData = createRouteManifest({ settings, fsMod }, logger);
+			let manifestData: ManifestData = ensure404Route(
+				createRouteManifest({ settings, fsMod }, logger)
+			);
+			const pipeline = DevPipeline.create(manifestData, { loader, logger, manifest, settings });
 			const controller = createController({ loader });
 			const localStorage = new AsyncLocalStorage();
 
@@ -43,7 +46,8 @@ export default function createVitePluginAstroServer({
 			function rebuildManifest(needsManifestRebuild: boolean) {
 				pipeline.clearRouteCache();
 				if (needsManifestRebuild) {
-					manifestData = createRouteManifest({ settings }, logger);
+					manifestData = ensure404Route(createRouteManifest({ settings }, logger));
+					pipeline.setManifestData(manifestData);
 				}
 			}
 			// Rebuild route manifest on file change, if needed.
@@ -118,7 +122,7 @@ export function createDevelopmentManifest(settings: AstroSettings): SSRManifest 
 	if (settings.config.i18n) {
 		i18nManifest = {
 			fallback: settings.config.i18n.fallback,
-			strategy: toRoutingStrategy(settings.config.i18n),
+			strategy: toRoutingStrategy(settings.config.i18n.routing, settings.config.i18n.domains),
 			defaultLocale: settings.config.i18n.defaultLocale,
 			locales: settings.config.i18n.locales,
 			domainLookupTable: {},
@@ -131,16 +135,17 @@ export function createDevelopmentManifest(settings: AstroSettings): SSRManifest 
 		assets: new Set(),
 		entryModules: {},
 		routes: [],
-		adapterName: '',
+		adapterName: settings?.adapter?.name || '',
 		clientDirectives: settings.clientDirectives,
 		renderers: [],
 		base: settings.config.base,
 		assetsPrefix: settings.config.build.assetsPrefix,
-		site: settings.config.site
-			? new URL(settings.config.base, settings.config.site).toString()
-			: settings.config.site,
+		site: settings.config.site,
 		componentMetadata: new Map(),
+		inlinedScripts: new Map(),
 		i18n: i18nManifest,
+		checkOrigin: settings.config.experimental.security?.csrfProtection?.origin ?? false,
+		rewritingEnabled: settings.config.experimental.rewriting,
 		middleware(_, next) {
 			return next();
 		},

@@ -13,7 +13,7 @@ describe('Experimental Content Collections cache inlineStylesheets', () => {
 			// to bust cache and prevent modules and their state
 			// from being reused
 			site: 'https://test.dev/',
-			root: './fixtures/css-inline-stylesheets/',
+			root: './fixtures/css-inline-stylesheets-2/',
 			output: 'static',
 			build: {
 				inlineStylesheets: 'never',
@@ -92,7 +92,7 @@ describe('Experimental Content Collections cache - inlineStylesheets to never in
 	});
 });
 
-describe.skip('Experimental Content Collections cache - inlineStylesheets to auto in static output', () => {
+describe('Experimental Content Collections cache - inlineStylesheets to auto in static output', () => {
 	let fixture;
 
 	before(async () => {
@@ -120,7 +120,7 @@ describe.skip('Experimental Content Collections cache - inlineStylesheets to aut
 
 	after(async () => await fixture.clean());
 
-	it.skip(
+	it(
 		'Renders some <style> and some <link> tags',
 		{ todo: 'Styles have the wrong length' },
 		async () => {
@@ -145,64 +145,6 @@ describe.skip('Experimental Content Collections cache - inlineStylesheets to aut
 	});
 });
 
-describe('Setting inlineStylesheets to auto in server output', () => {
-	let app;
-	let fixture;
-
-	before(async () => {
-		fixture = await loadFixture({
-			// inconsequential config that differs between tests
-			// to bust cache and prevent modules and their state
-			// from being reused
-			site: 'https://test.info/',
-			root: './fixtures/css-inline-stylesheets/',
-			output: 'server',
-			adapter: testAdapter(),
-			build: {
-				inlineStylesheets: 'auto',
-			},
-			vite: {
-				build: {
-					assetsInlineLimit: 512,
-				},
-			},
-			experimental: {
-				contentCollectionCache: true,
-			},
-		});
-		await fixture.build();
-		app = await fixture.loadTestAdapterApp();
-	});
-
-	after(async () => await fixture.clean());
-
-	it(
-		'Renders some <style> and some <link> tags',
-		{ todo: 'Check the length of the styles, it seems incorrect' },
-		async () => {
-			const request = new Request('http://example.com/');
-			const response = await app.render(request);
-			const html = await response.text();
-			const $ = cheerio.load(html);
-
-			// the count of style/link tags depends on our css chunking logic
-			// this test should be updated if it changes
-			// assert.equal($('style').length, 3);
-			// assert.equal($('link[rel=stylesheet]').length, 1);
-		}
-	);
-
-	describe('Inspect linked and inlined stylesheets', () => {
-		const allStyles = {};
-
-		before(async () => {
-			allStyles.value = await stylesFromServer(app);
-		});
-
-		commonExpectations(allStyles);
-	});
-});
-
 describe('Setting inlineStylesheets to always in static output', () => {
 	let fixture;
 
@@ -212,7 +154,10 @@ describe('Setting inlineStylesheets to always in static output', () => {
 			// to bust cache and prevent modules and their state
 			// from being reused
 			site: 'https://test.net/',
-			root: './fixtures/css-inline-stylesheets/',
+			// TODO: Uses -3 variant to bust ESM module cache when rendering the pages. Particularly in
+			// `node_modules/.astro/content/entry.mjs` and `import('./en/endeavour.mjs')`. Ideally this
+			// should be solved in core, but using this workaround for now.
+			root: './fixtures/css-inline-stylesheets-3/',
 			output: 'static',
 			build: {
 				inlineStylesheets: 'always',

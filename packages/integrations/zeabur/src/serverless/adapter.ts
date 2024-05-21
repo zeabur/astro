@@ -116,14 +116,7 @@ export default function vercelServerless({
 					},
 				});
 			},
-			'astro:config:done': ({ setAdapter, config, logger }) => {
-				if (functionPerRoute === true) {
-					logger.warn(
-						`Vercel's hosting plans might have limits to the number of functions you can create.
-Make sure to check your plan carefully to avoid incurring additional costs.
-You can set functionPerRoute: false to prevent surpassing the limit.`
-					);
-				}
+			'astro:config:done': ({ setAdapter, config}) => {
 				setAdapter(getAdapter({ functionPerRoute, edgeMiddleware }));
 				_config = config;
 				buildTempFolder = config.build.server;

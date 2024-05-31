@@ -1,7 +1,7 @@
 {
   "name": "@zeabur/astro-adapter",
   "description": "Deploy your site to Zeabur",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "author": "zeabur",
   "license": "MIT",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@astrojs/internal-helpers": "0.2.1",
-    "@vercel/nft": "^0.24.3",
+    "@vercel/nft": "^0.27.0",
     "esbuild": "^0.19.6",
     "fast-glob": "^3.3.2",
     "set-cookie-parser": "^2.6.0",

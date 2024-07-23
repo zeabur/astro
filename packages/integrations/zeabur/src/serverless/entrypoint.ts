@@ -6,6 +6,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ASTRO_LOCALS_HEADER } from './adapter.js';
 import { getRequest, setResponse } from './request-transform.js';
 
+// Won't throw if the virtual module is not available because it's not supported in
+// the users's astro version or if astro:env is not enabled in the project
+await import('astro/env/setup')
+	.then((mod) => mod.setGetEnv((key) => process.env[key]))
+	.catch(() => {});
+
 applyPolyfills();
 
 export const createExports = (manifest: SSRManifest) => {

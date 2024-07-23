@@ -41,6 +41,7 @@ function getAdapter({
 				isSharpCompatible: true,
 				isSquooshCompatible: true,
 			},
+			envGetSecret: 'experimental',
 		},
 	};
 }
@@ -111,7 +112,10 @@ export default function vercelServerless({
 					},
 					vite: {
 						ssr: {
-							external: ['@vercel/nft'],
+							external: [
+								'@vercel/nft',
+								...((await shouldExternalizeAstroEnvSetup()) ? ['astro/env/setup'] : []),
+							],
 						},
 					},
 				});
@@ -259,4 +263,9 @@ async function createFunctionFolder({
 	await writeJson(new URL(`./package.json`, functionFolder), {
 		type: 'module',
 	});
+}
+
+// TODO: remove once we don't use a TLA anymore
+async function shouldExternalizeAstroEnvSetup() {
+	return await import('astro/env/setup').then(() => false).catch(() => true);
 }

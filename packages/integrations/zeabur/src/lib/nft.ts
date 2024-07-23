@@ -1,8 +1,8 @@
-import type { AstroIntegrationLogger } from 'astro';
+import { existsSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join, relative, relative as relativePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import type { AstroIntegrationLogger } from 'astro';
 import { copyFilesToFunction } from './fs.js';
 
 export async function copyDependenciesToFunction(

@@ -1,3 +1,5 @@
+import { basename } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type {
 	AstroAdapter,
 	AstroConfig,
@@ -7,8 +9,6 @@ import type {
 } from 'astro';
 import { AstroError } from 'astro/errors';
 import glob from 'fast-glob';
-import { basename } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getOutput, removeDir, writeJson } from '../lib/fs.js';
 import { copyDependenciesToFunction } from '../lib/nft.js';
 import { generateEdgeMiddleware } from './middleware.js';
@@ -120,7 +120,7 @@ export default function vercelServerless({
 					},
 				});
 			},
-			'astro:config:done': ({ setAdapter, config}) => {
+			'astro:config:done': ({ setAdapter, config }) => {
 				setAdapter(getAdapter({ functionPerRoute, edgeMiddleware }));
 				_config = config;
 				buildTempFolder = config.build.server;
@@ -151,7 +151,7 @@ export default function vercelServerless({
 				}
 			},
 
-			'astro:build:done': async ({ routes, logger }) => {
+			'astro:build:done': async ({ logger }) => {
 				// Merge any includes from `vite.assetsInclude
 				if (_config.vite.assetsInclude) {
 					const mergeGlobbedIncludes = (globPattern: unknown) => {
@@ -215,7 +215,10 @@ export default function vercelServerless({
 					routeDefinitions.push({ src: '/.*', dest: '__astro' });
 				}
 
-				await writeJson(new URL(`./config.json`, _config.outDir), {"routes":[{"src":".*","dest":"/__astro"}],"containerized":false});
+				await writeJson(new URL(`./config.json`, _config.outDir), {
+					routes: [{ src: '.*', dest: '/__astro' }],
+					containerized: false,
+				});
 
 				// Remove temporary folder
 				await removeDir(buildTempFolder);

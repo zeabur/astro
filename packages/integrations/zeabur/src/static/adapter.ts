@@ -54,7 +54,10 @@ export default function vercelStatic(): AstroIntegration {
 				await emptyDir(getOutput(_config.root));
 			},
 			'astro:build:done': async () => {
-				await writeJson(new URL(`./config.json`, getOutput(_config.root)), {"routes":[{"src":".*","dest":"/__astro"}],"containerized":false});
+				await writeJson(new URL(`./config.json`, getOutput(_config.root)), {
+					routes: [{ src: '.*', dest: '/__astro' }],
+					containerized: false,
+				});
 			},
 		},
 	};
